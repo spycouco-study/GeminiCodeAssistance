@@ -1,0 +1,2 @@
+#파일 경로 지정
+pip install -r requirements.txt

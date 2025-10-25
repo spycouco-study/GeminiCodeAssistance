@@ -1,0 +1,11 @@
+# 원하는 폴더로 이동
+#cd C:\dev\ml-project
+
+# 가상환경 생성 (이름: .venv)
+python -m venv .venv
+
+# 가상환경 활성화
+.venv\Scripts\activate
+
+# 가상환경 비활성화
+deactivate
