@@ -190,6 +190,7 @@ async def process_code(request: CodeRequest):
             raise HTTPException(status_code=400, detail="코드 생성에 실패했습니다.")
 
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 # /revert 엔드포인트 추가
@@ -204,9 +205,10 @@ async def revert_code():
             with open(CODE_PATH, 'w', encoding='utf-8') as f:
                 f.write(old_code)
             
-            return {"status": "success", "message": "코드를 이전 버전으로 되돌렸습니다."}
+            return {"status": "success", "reply": "코드를 이전 버전으로 되돌렸습니다."}
         else:
-            raise HTTPException(status_code=404, detail="되돌릴 코드가 없습니다.")
+            return {"status": "success", "reply": "되돌릴 코드가 없습니다."}
+            #raise HTTPException(status_code=404, detail="되돌릴 코드가 없습니다.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
