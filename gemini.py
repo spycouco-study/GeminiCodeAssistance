@@ -4,17 +4,27 @@ from google import genai
 from google.genai import types
 import os
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
+# FastAPI 앱 인스턴스 생성
+app = FastAPI(title="Gemini Code Assistant API")
 
+# 환경 변수 로드
+load_dotenv()
 
-load_dotenv() 
-
-
-
-# OpenAI API 클라이언트 초기화
-# OPENAI_API_KEY 불러와서 GPT 모델 호출에 사용
+# Gemini API 초기화
 gemini_api_key = os.getenv('GEMINI_API_KEY')
 model_name = "gemini-2.5-flash"
+
+# 요청 모델 정의
+class CodeRequest(BaseModel):
+    message: str
+
+# 서버 상태 체크를 위한 헬스체크 엔드포인트
+@app.get("/")
+async def root():
+    return {"status": "healthy", "message": "Gemini Code Assistant API is running"}
 
 
 
@@ -112,10 +122,6 @@ except Exception as e:
     print("환경 변수 GEMINI_API_KEY가 설정되었는지 확인해 주세요.")
     exit()
 
-# 💡 config 객체를 생성하여 응답 형식을 JSON으로 지정합니다.
-config = types.GenerateContentConfig(
-    response_mime_type="application/json"
-)
 
 
 
@@ -129,37 +135,24 @@ CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\Ga
 
 
 
-while True:
-    query = input("안녕하세요. 무엇을 도와드릴까요?\n(exit를 입력하면 종료됩니다.)\n(revert를 입력하면 최근 수정사항을 되돌립니다.)\n")
-
-    if query == 'exit':
-        break
-    elif query == 'revert':
-        if os.path.exists(OLD_VERSION):
-            with open(OLD_VERSION, 'r', encoding='utf-8') as f:
-                old_code = f.read()
-                
-            with open(CODE_PATH, 'w', encoding='utf-8') as f:
-                f.write(old_code)
-
-            print("코드를 이전 버전으로 되돌렸습니다.")
-            continue
-        else:
-            print("되돌릴 코드가 없습니다.")
-            continue
-
-
-
-    code = remove_comments_from_file(CODE_PATH)
-
-    if code == "":
-        prompt = f"{query} 이 것은 하나의 TypeScript 파일로 구동되는 게임을 만들기 위한 요청입니다. 게임은 'gameCanvas'에 표시되어야 합니다. 게임 코드를 생성하고 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요."
-    else:
-        prompt = f"{query} 이 것은 아래의 코드에 대한 수정요청이에요. 어떤 수정사항이 있었는지 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요.\n\n{code}"
-
-    # 모델 호출 및 응답 생성
-    print(f"모델 호출 중: {model_name}...")
+@app.post("/process-code")
+async def process_code(request: CodeRequest):
+    """코드 처리 엔드포인트"""
     try:
+        code = remove_comments_from_file(CODE_PATH)
+        
+        if code == "":
+            prompt = f"{request.message} 이 것은 하나의 TypeScript 파일로 구동되는 게임을 만들기 위한 요청입니다. 게임은 'gameCanvas'에 표시되어야 합니다. 게임 코드를 생성하고 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요."
+        else:
+            prompt = f"{request.message} 이 것은 아래의 코드에 대한 수정요청이에요. 어떤 수정사항이 있었는지 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요.\n\n{code}"
+
+        # 💡 config 객체를 생성하여 응답 형식을 JSON으로 지정합니다.
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json"
+        )
+        
+        # 모델 호출 및 응답 생성
+        print(f"AI 모델이 작업 중 입니다: {model_name}...")
         response = gemini_client.models.generate_content(
             model=model_name,
             #config = config,
@@ -168,30 +161,70 @@ while True:
 
         code_content, non_code_text = split_gemini_response_code(response.text)
 
-        if code_content != None:
+        if code_content is not None:
+            # 이전 버전 백업
             if code != "":
                 with open(OLD_VERSION, 'w', encoding='utf-8') as f:
                     f.write(code)
 
+            # 새 코드 저장
             with open(CODE_PATH, 'w', encoding='utf-8') as f:
                 f.write(code_content)
             
+            # 주석 제거된 버전 저장
             if CODE_PATH_NOCOMMENT != "":
                 with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
-                    f.write(remove_comments_from_file(CODE_PATH))
-        else:
-            code_content = ""
+                    f.write(remove_comments_from_file(CODE_PATH_NOCOMMENT))
 
-        # 응답 결과 출력
-        print("\n--- Gemini 응답 결과 ---")
-        #print(code_content)
-        print(non_code_text)
-        print("-----------------------\n")
+            # return {
+            #     "status": "success",
+            #     "code": code_content,
+            #     "explanation": non_code_text
+            # }
+            return {
+                "status": "success",
+                "code": code_content,
+                "reply": non_code_text
+            }
+        else:
+            raise HTTPException(status_code=400, detail="코드 생성에 실패했습니다.")
 
     except Exception as e:
-        print(f"API 호출 중 오류 발생: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-print("프로그램이 종료되었습니다.")
+# /revert 엔드포인트 추가
+@app.post("/revert")
+async def revert_code():
+    """코드를 이전 버전으로 되돌리는 엔드포인트"""
+    try:
+        if os.path.exists(OLD_VERSION):
+            with open(OLD_VERSION, 'r', encoding='utf-8') as f:
+                old_code = f.read()
+            
+            with open(CODE_PATH, 'w', encoding='utf-8') as f:
+                f.write(old_code)
+            
+            return {"status": "success", "message": "코드를 이전 버전으로 되돌렸습니다."}
+        else:
+            raise HTTPException(status_code=404, detail="되돌릴 코드가 없습니다.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+# 서버 실행 방법 1: uvicorn 명령어로 직접 실행 (권장)
+# uvicorn gemini:app --reload --port 8000
+
+# 서버 실행 방법 2: Python 스크립트로 직접 실행
+
+if __name__ == "__main__":
+    import uvicorn
+    print("서버를 시작합니다... http://localhost:8000")
+    uvicorn.run(
+        "gemini:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,      # 코드 변경 감지
+        log_level="debug",  # 디버그 로그 활성화
+        workers=1        # 디버깅을 위해 단일 워커 사용
+    )
 
 
