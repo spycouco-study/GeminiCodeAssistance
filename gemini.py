@@ -28,7 +28,7 @@ def remove_comments_from_file(file_path):
     """
     
     if not os.path.exists(file_path):
-        return f"오류: 파일 경로를 찾을 수 없습니다: {file_path}"
+        return ""#f"오류: 파일 경로를 찾을 수 없습니다: {file_path}"
     
     with open(file_path, 'r', encoding='utf-8') as f:
         code_string = f.read()
@@ -119,22 +119,43 @@ config = types.GenerateContentConfig(
 
 
 
-CODE_PATH = Path(__file__).parent / "playground" / "playground.py"
-CODE_PATH_NOCOMMENT = Path(__file__).parent / "playground" / "playground_nocomment.py"
+#CODE_PATH = Path(__file__).parent / "playground" / "playground.py"
+#CODE_PATH_NOCOMMENT = Path(__file__).parent / "playground" / "playground_nocomment.py"
+
+FILE_NAME = "bubble game.ts"
+CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\src" + "\\" + FILE_NAME)
+OLD_VERSION = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion\(old)" + FILE_NAME)
+CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\GameFolder\src\bear block game(nocomment).ts")
 
 
 
 while True:
-    query = input("안녕하세요. 무엇을 도와드릴까요?\n(exit를 입력하면 종료됩니다.)\n")
+    query = input("안녕하세요. 무엇을 도와드릴까요?\n(exit를 입력하면 종료됩니다.)\n(revert를 입력하면 최근 수정사항을 되돌립니다.)\n")
 
     if query == 'exit':
         break
+    elif query == 'revert':
+        if os.path.exists(OLD_VERSION):
+            with open(OLD_VERSION, 'r', encoding='utf-8') as f:
+                old_code = f.read()
+                
+            with open(CODE_PATH, 'w', encoding='utf-8') as f:
+                f.write(old_code)
+
+            print("코드를 이전 버전으로 되돌렸습니다.")
+            continue
+        else:
+            print("되돌릴 코드가 없습니다.")
+            continue
+
+
 
     code = remove_comments_from_file(CODE_PATH)
 
-    # 모델에게 전달할 프롬프트(요청)입니다.
-    #prompt = "사용자가 스페이스바를 누를때 마다 A 부터 Z까지 콘솔에 출력되는 파이썬 코드 작성해줘."
-    prompt = f"{query} 이 것은 아래의 코드에 대한 수정요청이에요. 어떤 수정사항이 있었는지 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요.\n\n{code}"
+    if code == "":
+        prompt = f"{query} 이 것은 하나의 TypeScript 파일로 구동되는 게임을 만들기 위한 요청입니다. 게임은 'gameCanvas'에 표시되어야 합니다. 게임 코드를 생성하고 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요."
+    else:
+        prompt = f"{query} 이 것은 아래의 코드에 대한 수정요청이에요. 어떤 수정사항이 있었는지 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요.\n\n{code}"
 
     # 모델 호출 및 응답 생성
     print(f"모델 호출 중: {model_name}...")
@@ -148,17 +169,22 @@ while True:
         code_content, non_code_text = split_gemini_response_code(response.text)
 
         if code_content != None:
+            if code != "":
+                with open(OLD_VERSION, 'w', encoding='utf-8') as f:
+                    f.write(code)
+
             with open(CODE_PATH, 'w', encoding='utf-8') as f:
                 f.write(code_content)
             
-            with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
-                f.write(remove_comments_from_file(CODE_PATH))
+            if CODE_PATH_NOCOMMENT != "":
+                with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
+                    f.write(remove_comments_from_file(CODE_PATH))
         else:
             code_content = ""
 
         # 응답 결과 출력
         print("\n--- Gemini 응답 결과 ---")
-        print(code_content)
+        #print(code_content)
         print(non_code_text)
         print("-----------------------\n")
 
