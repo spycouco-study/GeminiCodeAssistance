@@ -5,10 +5,36 @@ from google.genai import types
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from classes import AnswerTemplateProcessor, ClientError, QuestionTemplateProcessor
+#from supabase import format_chat_history, get_session_history
 
 # FastAPI 앱 인스턴스 생성
 app = FastAPI(title="Gemini Code Assistant API")
+
+# ⚠️ CORS 설정: 클라이언트 브라우저가 요청을 보내도록 허용
+# 개발 환경(예: http://localhost:5500)에서 실행되는 클라이언트 허용
+origins = [
+    "http://localhost",
+    "http://localhost:8080",
+    # 게임이 실행되는 클라이언트 주소를 추가해야 합니다.
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
+
+
+
 
 # 환경 변수 로드
 load_dotenv()
@@ -135,6 +161,35 @@ CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\Ga
 
 
 
+@app.post("/category")
+async def category(request: CodeRequest):
+    prompt = f"[사용자쿼리: {request.message}]\n" + """
+    이 앱은 사용자의 자연어 입력을 받아 게임을 만드는 앱입니다.
+    당신은 사용자쿼리가 아래의 카테고리 중 어디에 속하는지 분류해야 합니다.
+        1: 코드를 수정해 달라는 요청.
+        2: 코드와 관련된 질문.
+        3: 기타.
+        4: 부적절/비윤리적/서비스 범위초과
+    아래와 같은 json 형식으로 답변해 주세요.
+    {
+        "category": int,
+        "dscription: str,
+        "response": str
+    }
+    """
+
+    response = gemini_client.models.generate_content(
+        model=model_name,
+        contents=prompt
+    )
+
+    return {
+        "status": "success",
+        "reply": response.text
+    }
+
+
+
 @app.post("/process-code")
 async def process_code(request: CodeRequest):
     """코드 처리 엔드포인트"""
@@ -193,6 +248,65 @@ async def process_code(request: CodeRequest):
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.post("/client-error")
+async def log_client_error(error_data: ClientError):
+    """
+    클라이언트로부터 전송된 오류 로그를 받아 처리합니다.
+    """
+    # 🌟 1. 로그 기록 (가장 중요)
+    print(f"[{error_data.time}] 💥 CLIENT ERROR ({error_data.type})")
+    print(f"  Version: {error_data.game_version}")
+    print(f"  Message: {error_data.message}")
+    
+    if error_data.stack:
+        print(f"  Stack Trace:\n{error_data.stack[:200]}...") # 스택은 너무 길 수 있으므로 일부만 출력
+    
+    # 🌟 2. 실제 데이터베이스나 파일에 저장
+    # 예: log_to_database(error_data)
+    # 예: log_to_file(error_data)
+
+    # 클라이언트에게 성공적으로 받았음을 응답합니다.
+    return {"status": "success", "message": "Error logged successfully"}
+
+
+qtp = QuestionTemplateProcessor()
+atp = AnswerTemplateProcessor()
+
+@app.post("/question")
+async def process_code(request: CodeRequest):
+    try:        
+        history = format_chat_history(get_session_history(0))
+        specification = ""
+        prompt = qtp.get_final_prompt(history, request.message, specification)
+
+        return {
+            "reply": prompt
+        }
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.post("/answer")
+async def process_code(request: CodeRequest):
+    try:        
+        history = ""
+        specification = ""
+        prompt = atp.get_final_prompt(specification)
+
+        return {
+            "reply": prompt
+        }
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # /revert 엔드포인트 추가
 @app.post("/revert")
 async def revert_code():
@@ -216,7 +330,6 @@ async def revert_code():
 # uvicorn gemini:app --reload --port 8000
 
 # 서버 실행 방법 2: Python 스크립트로 직접 실행
-
 if __name__ == "__main__":
     import uvicorn
     print("서버를 시작합니다... http://localhost:8000")
