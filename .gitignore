@@ -15,4 +15,4 @@ __pycache__/
 .env
 
 # 스냅샷 테스트 폴더
-.snapshot_test/
+snapshot_test/

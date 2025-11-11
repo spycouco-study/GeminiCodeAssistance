@@ -151,7 +151,10 @@ def make_new_version_name(archive_root: Path, parent_name: str | None):
 
 
 
-
+# V1-1과 같은 버전 폴더가 존재하는지 확인하는 보조 함수 (필요한 경우)
+def check_version_exists(archive_root: Path, version_name: str) -> bool:
+    """아카이브 루트에 특정 버전 폴더가 존재하는지 확인합니다."""
+    return (archive_root / version_name).is_dir()
 
 # 주요 함수
 def create_version(root: Path, ignore_patterns, parent_name = None, chat=None, summary=""):
@@ -169,6 +172,43 @@ def create_version(root: Path, ignore_patterns, parent_name = None, chat=None, s
     #         parent_files = parent_meta["file_index"]
     # else:
     #     parent_name = None
+
+
+
+    # ----------------------------------------------------
+    # 💡 [추가된 유효성 검사 로직 시작]
+    # ----------------------------------------------------
+    
+    if parent_name is None:
+        # 1. parent_name이 None일 경우: V1-1이 존재하는지 검사
+        
+        # V1-1이 존재하면, None은 잘못된 입력이다.
+        if check_version_exists(archive_root, "v1-1"):
+             # archive_root.iterdir()를 통해 버전이 하나라도 있는지 확인하는 것도 방법
+            print(
+                f"parent_name이 None이지만, 아카이브 폴더 '{archive_root}'에 "
+                f"최소 버전인 'V1-1'이 이미 존재합니다. "
+                f"새 버전을 생성하려면 유효한 상위 버전 이름을 지정해야 합니다."
+            )
+            return
+        # V1-1이 존재하지 않으면, None은 정상 입력으로 V1-1이 생성될 예정
+        
+    else:
+        # 2. parent_name이 지정된 경우: 해당 버전 폴더가 존재하는지 검사
+        parent_dir = archive_root / parent_name
+        
+        # 지정된 parent_name이 아카이브 폴더 안에 존재하지 않으면 잘못된 입력이다.
+        if not parent_dir.is_dir():
+            print(
+                f"지정된 상위 버전 이름 '{parent_name}'에 해당하는 폴더가 "
+                f"아카이브 경로 '{archive_root}'에 존재하지 않습니다. "
+            )
+            return
+            
+    # ----------------------------------------------------
+    # 💡 [유효성 검사 로직 끝]
+    # ----------------------------------------------------
+
 
 
     parent_meta = None
@@ -512,16 +552,16 @@ def main():
 
 
 
-root = Path.cwd() / "test"
+root = Path(r"C:\Users\UserK\Desktop\final project\snapshot_test") / "test"
 ignore = DEFAULT_IGNORE.copy()
 
 
 
 
 #create_version(root, ignore)
-#create_version(root, ignore, parent_name="v1-1")
+create_version(root, ignore, parent_name="v3-1")
 
 
 
 
-restore_version(root, "v1-1")
+#restore_version(root, "v1-1")
