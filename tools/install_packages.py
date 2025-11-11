@@ -32,5 +32,6 @@ import sys, os, pathlib
 #sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent.parent)) # install_packages.py의 경로 추가
 sys.path.append(str(pathlib.Path(os.getcwd()))) # install_packages.py의 경로 추가
 # from tools.install_packages import install_packages
-install_packages(["google.genai", "dotenv", "keyboard", "fastapi", "uvicorn", "supabase"]) # 설치가 필요한 패키지 리스트
+install_packages(["google.genai", "dotenv", "keyboard", "fastapi", "uvicorn", "supabase",
+                  "Pillow"]) # 설치가 필요한 패키지 리스트
 #############################################################################################################

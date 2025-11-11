@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -131,38 +132,42 @@ def format_error_message_simplified(error_text: str, filename: str) -> str:
 
 
 # --- 사용 예시 ---
-FILE_NAME = "bubble game.ts"
+FILE_NAME = "love game.ts"
 CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\src" + "\\" + FILE_NAME)
 CONFIG_FILE_NAME = "tsconfig.json"
 CONFIG_CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder" + "\\" + CONFIG_FILE_NAME)
 
 
+def check_typescript_compile_error(file_path:Path):
+    print(f"📄 {file_path.name} 파일을 {CONFIG_FILE_NAME} 설정으로 검사 시작...")
 
-print(f"📄 {FILE_NAME} 파일을 {CONFIG_FILE_NAME} 설정으로 검사 시작...")
+    analysis_result = check_typescript_errors_with_options(CONFIG_CODE_PATH, file_path)
 
-analysis_result = check_typescript_errors_with_options(CONFIG_CODE_PATH, CODE_PATH)
+    print("\n--- 검사 결과 ---")
+    if not analysis_result['success']:
+        print(f"🚨 파일 ({file_path.name}) 오류가 발견되었습니다.")
+        error_message = analysis_result['stdout']
+        parts = error_message.split('\n')
 
-print("\n--- 검사 결과 ---")
-if not analysis_result['success']:
-    print(f"🚨 파일 ({FILE_NAME}) 오류가 발견되었습니다.")
-    error_message = analysis_result['stdout']
-    parts = error_message.split('\n')
+        formatted_messages = []
 
-    formatted_messages = []
+        # 오류 메시지 확인
+        print("\n=== AI에게 전달할 오류 메시지 (stderr) ===")
+        # 'parts'는 나눠진 오류 문자열들의 리스트라고 가정합니다.
+        for p in parts:
+            # 2. 함수를 호출하고 그 결과를 변수에 저장합니다.
+            formatted_p = format_error_message_simplified(p, file_path.name)
+            
+            # 3. 리스트에 결과를 추가합니다.
+            formatted_messages.append(formatted_p)    
+            print(formatted_p)
+            
+        print("------------------------------------------")    
 
-    # 오류 메시지 확인
-    print("\n=== AI에게 전달할 오류 메시지 (stderr) ===")
-    # 'parts'는 나눠진 오류 문자열들의 리스트라고 가정합니다.
-    for p in parts:
-        # 2. 함수를 호출하고 그 결과를 변수에 저장합니다.
-        formatted_p = format_error_message_simplified(p, FILE_NAME)
-        
-        # 3. 리스트에 결과를 추가합니다.
-        formatted_messages.append(formatted_p)    
-        print(formatted_p)
-        
-    print("------------------------------------------")    
-else:
-    print(f"✅ 파일 ({FILE_NAME}) 오류가 없습니다.")
-    # 정상적인 경우 출력은 보통 비어있습니다.
-    # print(analysis_result['stdout'])
+        multi_line_string = "\n".join(formatted_messages)
+        return multi_line_string
+    else:
+        print(f"✅ 파일 game.ts에 오류가 없습니다.")
+        # 정상적인 경우 출력은 보통 비어있습니다.
+        # print(analysis_result['stdout'])
+        return ""

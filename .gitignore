@@ -13,3 +13,6 @@ __pycache__/
 
 # 환경 변수 파일
 .env
+
+# 스냅샷 테스트 폴더
+.snapshot_test/

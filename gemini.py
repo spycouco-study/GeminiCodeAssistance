@@ -1,14 +1,20 @@
+import json
 from pathlib import Path
 import re
 from google import genai
 from google.genai import types
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from realtime import List
 
-from classes import AnswerTemplateProcessor, ClientError, QuestionTemplateProcessor
+from classes import AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor
+from make_dummy_image_asset_copy_2 import check_and_create_images_with_text
+from make_dummy_sound_asset import copy_and_rename_sound_files
+from tools.debug_print import debug_print
+from tsc import check_typescript_compile_error
 #from supabase import format_chat_history, get_session_history
 
 # FastAPI 앱 인스턴스 생성
@@ -90,6 +96,48 @@ def remove_comments_from_file(file_path):
 
 
 
+def remove_code_fences_safe(code_string: str) -> str:
+    """
+    문자열의 맨 처음과 맨 끝에 있는 Markdown 코드 블록(```)을 안전하게 제거합니다.
+    시작과 끝 모두 백틱이 명확하게 존재하는지 검사합니다.
+    
+    Args:
+        code_string: 백틱으로 감싸인 코드 문자열.
+
+    Returns:
+        백틱이 제거된 순수한 코드 문자열.
+    """
+    # 1. 문자열 앞뒤의 공백/줄바꿈을 제거합니다.
+    stripped_string = code_string.strip()
+    
+    # 2. 앞쪽 백틱(```) 검사 및 제거
+    content_start = 0
+    if stripped_string.startswith('```'):
+        # 첫 줄바꿈 위치를 찾아 언어 지정(예: typescript) 부분을 건너뜁니다.
+        stripped_string = stripped_string.replace('\\n', '\n')
+        first_newline_index = stripped_string.find('\n')
+        
+        if first_newline_index != -1:
+            # '\n' 이후부터 코드가 시작됩니다.
+            content_start = first_newline_index + 1
+        else:
+            # 한 줄짜리 코드인 경우, 단순히 '```' 세 글자만 제거합니다.
+            content_start = 3
+    
+    # 앞쪽 백틱을 제거한 문자열
+    processed_string = stripped_string[content_start:]
+    
+    # 3. 뒤쪽 백틱(```) 검사 및 제거 (가장 명확한 검증 부분)
+    # 앞쪽을 제거한 문자열의 뒤쪽 공백/줄바꿈을 다시 정리합니다.
+    final_string = processed_string.rstrip() 
+    
+    if final_string.endswith('```'):
+        # 백틱 세 개가 명확하게 존재하면, 끝에서 세 글자를 제거합니다.
+        final_string = final_string[:-3]
+        
+    return final_string.strip() # 최종적으로 앞뒤 공백/줄바꿈 다시 정리
+
+
 
 
 def split_gemini_response_code(response_text):
@@ -122,6 +170,7 @@ def split_gemini_response_code(response_text):
             # 코드 블록에서 구분자를 제거하고 내용을 추출
             # .strip()은 앞뒤 공백을 제거하여 코드를 깔끔하게 합니다.
             code_content = part.replace('<<<code_start>>>', '').replace('<<<code_end>>>', '').strip()
+            code_content = remove_code_fences_safe(code_content)
         else:
             # 코드 블록이 아닌 텍스트는 리스트에 추가
             non_code_parts.append(part.strip())
@@ -132,7 +181,6 @@ def split_gemini_response_code(response_text):
     non_code_text = re.sub(r'\n\s*\n', '\n', non_code_text).strip()
 
     return code_content, non_code_text
-
 
 
 
@@ -154,9 +202,30 @@ except Exception as e:
 #CODE_PATH = Path(__file__).parent / "playground" / "playground.py"
 #CODE_PATH_NOCOMMENT = Path(__file__).parent / "playground" / "playground_nocomment.py"
 
-FILE_NAME = "bubble game.ts"
-CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\src" + "\\" + FILE_NAME)
-OLD_VERSION = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion\(old)" + FILE_NAME)
+# 1. 게임 이름 정의 (수정 필요 없음)
+GAME_NAME = "test"
+
+# 2. 공통 기본 디렉토리 정의
+# 'C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\public'
+BASE_PUBLIC_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\public")
+
+# 3. Old Version 디렉토리 정의
+# 'C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion'
+BASE_OLD_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion")
+
+# --- 최종 경로 정의 ---
+
+# 현재 버전 경로 (BASE_PUBLIC_DIR / GAME_NAME)
+GAME_DIR = BASE_PUBLIC_DIR / GAME_NAME
+CODE_PATH = GAME_DIR / "game.ts"
+DATA_PATH = GAME_DIR / "data.json"
+SPEC_PATH = GAME_DIR / "spec.md"
+ASSETS_PATH = GAME_DIR / "assets"
+
+# 이전 버전 경로 (BASE_OLD_DIR / GAME_NAME)
+OLD_GAME_DIR = BASE_OLD_DIR / GAME_NAME
+OLD_CODE = OLD_GAME_DIR / "(old)game.ts"
+OLD_DATA = OLD_GAME_DIR / "(old)data.json"
 CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\GameFolder\src\bear block game(nocomment).ts")
 
 
@@ -166,8 +235,8 @@ async def category(request: CodeRequest):
     prompt = f"[사용자쿼리: {request.message}]\n" + """
     이 앱은 사용자의 자연어 입력을 받아 게임을 만드는 앱입니다.
     당신은 사용자쿼리가 아래의 카테고리 중 어디에 속하는지 분류해야 합니다.
-        1: 코드를 수정해 달라는 요청.
-        2: 코드와 관련된 질문.
+        1: 게임을 수정해 달라는 요청.
+        2: 게임과 관련된 질문.
         3: 기타.
         4: 부적절/비윤리적/서비스 범위초과
     아래와 같은 json 형식으로 답변해 주세요.
@@ -183,70 +252,288 @@ async def category(request: CodeRequest):
         contents=prompt
     )
 
+    reply_content = json.loads(remove_code_fences_safe(response.text))
+    cat = reply_content['category']
+    debug_print(cat)
+
+    result_text = ""
+    if cat == 1:
+        code_content, result_text = modify_code(request)
+    elif cat == 2:
+        result_text = describe_code(request)
+    elif cat == 3:
+        result_text = ""
+    elif cat == 4:
+        result_text = "제가 도와드릴 수 없는 요청이에요."
+
     return {
         "status": "success",
-        "reply": response.text
+        "reply": result_text
     }
 
 
+
+def describe_code(request: CodeRequest):
+    code = remove_comments_from_file(CODE_PATH)
+    
+    if code == "":
+        return "분석할 코드가 없습니다."
+    else:
+        prompt = request.message + """ 이 것은 아래의 코드에 대한 질문입니다.
+        답변은 반드시 다음과 같은 json 형식으로 해주세요: {response:str}""" + "\n\n<TypeScript code>\n" + code
+
+    # 모델 호출 및 응답 생성
+    print(f"AI 모델이 작업 중 입니다: {model_name}...")
+    response = gemini_client.models.generate_content(
+        model=model_name,
+        #config = config,
+        contents=prompt
+    )
+
+    reply_content = json.loads(remove_code_fences_safe(response.text))
+    print(reply_content)
+
+    return reply_content['response']
+
+makePTP = MakePromptTemplateProcessor()
+modifyPTP = ModifyPromptTemplateProcessor()
+
+
+# path = Path(r"C:\Users\UserK\Desktop\test.txt")
+# if os.path.exists(path):
+#     with open(path, 'r', encoding='utf-8') as f:
+#         text = f.read()
+
+
+# try:
+#     text2 = remove_code_fences_safe(text)    
+#     path2 = Path(r"C:\Users\UserK\Desktop\test2.txt")
+#     with open(path2, 'w', encoding='utf-8') as f:
+#             f.write(text2)
+
+#     responseJson = json.loads(text2)
+# except Exception as e:
+#     print(e)
+
+def parse_ai_response(response_text):
+    result = {}
+    
+    # 1. 코드 블록 추출
+    code_start = response_text.find("###CODE_START###") + len("###CODE_START###")
+    code_end = response_text.find("###CODE_END###")
+    result['game_code'] = response_text[code_start:code_end].strip()
+
+    # 2. 데이터 블록 추출 (JSON 문자열)
+    data_start = response_text.find("###DATA_START###") + len("###DATA_START###")
+    data_end = response_text.find("###DATA_END###")
+    json_string = response_text[data_start:data_end].strip()
+    result['game_data'] = json_string
+    
+    # 3. 필요 Asset 리스트 (JSON 문자열)
+    asset_start = response_text.find("###ASSET_LIST_START###") + len("###ASSET_LIST_START###")
+    asset_end = response_text.find("###ASSET_LIST_END###")
+    json_asset_string = response_text[asset_start:asset_end].strip()
+    result['asset_list'] = json_asset_string
+
+    # 4. 설명 블록 추출
+    desc_start = response_text.find("###DESCRIPTION_START###") + len("###DESCRIPTION_START###")
+    desc_end = response_text.find("###DESCRIPTION_END###")
+    result['description'] = response_text[desc_start:desc_end].strip()
+
+    # 필요하다면 여기서 result['game_data']에 대해 json.loads()를 별도로 실행
+    # game_data 블록은 순수한 JSON 텍스트이므로 이스케이프 문제가 훨씬 적습니다.
+    # ...
+
+    return result
+
+
+
+
+def parse_ai_response2(response_text):
+    result = {}
+    
+    # 1. 설명 블록 추출
+    code_start = response_text.find("###COMMENT_START###") + len("###COMMENT_START###")
+    code_end = response_text.find("###COMMENT_END###")
+    result['comment'] = response_text[code_start:code_end].strip()
+
+    # 2. 자연어 사양서 블록 추
+    code_start = response_text.find("###SPECIFICATION_START###") + len("###SPECIFICATION_START###")
+    code_end = response_text.find("###SPECIFICATION_END###")
+    result['specification'] = response_text[code_start:code_end].strip()
+
+    # 필요하다면 여기서 result['game_data']에 대해 json.loads()를 별도로 실행
+    # game_data 블록은 순수한 JSON 텍스트이므로 이스케이프 문제가 훨씬 적습니다.
+    # ...
+
+    return result
+
+
+
+
+#check_typescript_compile_error(CODE_PATH)
+
+def validate_json(json_str):
+    try:
+        json.loads(json_str)
+        return ""
+    except json.JSONDecodeError as e:
+        return f"{e.msg} (line {e.lineno}, col {e.colno})"
+    
+
+
+def modify_code(request):
+    """코드 처리 엔드포인트"""
+    #original_code = remove_comments_from_file(CODE_PATH)
+
+    if os.path.exists(CODE_PATH):
+        with open(CODE_PATH, 'r', encoding='utf-8') as f:
+            original_code = f.read()
+    else:
+        original_code = ""
+
+    if os.path.exists(DATA_PATH):
+        with open(DATA_PATH, 'r', encoding='utf-8') as f:
+            original_data = f.read()
+    else:
+        original_data = ""
+    
+
+
+    if original_code == "":
+        prompt = makePTP.get_final_prompt(request)
+    else:
+        prompt = modifyPTP.get_final_prompt(request, original_code, original_data)
+
+    # 💡 config 객체를 생성하여 응답 형식을 JSON으로 지정합니다.
+    # config = types.GenerateContentConfig(
+    #     response_mime_type="application/json"
+    # )
+    
+    # 모델 호출 및 응답 생성
+    print(f"AI 모델이 작업 중 입니다: {model_name}...")
+    response = gemini_client.models.generate_content(
+        model=model_name,
+        #config = config,
+        contents=prompt
+    )
+
+    #responseData = json.loads(remove_code_fences_safe(response.text))
+    responseData = parse_ai_response(response.text)
+
+    game_code = remove_code_fences_safe(responseData['game_code'])
+    game_data = remove_code_fences_safe(responseData['game_data'])
+    #asset_list = remove_code_fences_safe(responseData['asset_list'])
+    # asset_list = json.loads(asset_list)
+    # print(asset_list)
+    # check_and_create_images(asset_list, ASSETS_PATH)
+    
+    error = validate_json(game_data)
+
+    json_data = json.loads(game_data)
+    print(json_data.get('assets', {}))
+
+    check_and_create_images_with_text(json_data, GAME_DIR)
+    copy_and_rename_sound_files(json_data, GAME_DIR)
+    description = remove_code_fences_safe(responseData['description'])
+    #split_gemini_response_code(response.text)
+
+    if game_code is not None:
+        # 이전 버전 백업
+        if original_code != "":
+            directory_path = os.path.dirname(OLD_CODE) 
+            if directory_path:
+                os.makedirs(directory_path, exist_ok=True)
+
+            with open(OLD_CODE, 'w', encoding='utf-8') as f:
+                f.write(original_code)
+
+        if original_data != "":            
+            directory_path = os.path.dirname(OLD_DATA) 
+            if directory_path:
+                os.makedirs(directory_path, exist_ok=True)
+
+            with open(OLD_DATA, 'w', encoding='utf-8') as f:
+                f.write(original_data)
+
+
+
+        # 새 코드 저장          
+        directory_path = os.path.dirname(CODE_PATH) 
+        if directory_path:
+            os.makedirs(directory_path, exist_ok=True)
+
+        with open(CODE_PATH, 'w', encoding='utf-8') as f:  
+            f.write(game_code)
+              
+        directory_path = os.path.dirname(DATA_PATH) 
+        if directory_path:
+            os.makedirs(directory_path, exist_ok=True)
+
+        with open(DATA_PATH, 'w', encoding='utf-8') as f:  
+            f.write(game_data)
+
+
+
+        # 주석 제거된 버전 저장
+        if CODE_PATH_NOCOMMENT != "":
+            with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
+                f.write(remove_comments_from_file(CODE_PATH_NOCOMMENT))
+
+        if error == "":
+            error = check_typescript_compile_error(CODE_PATH)
+        else:
+            error = error + '\n' + check_typescript_compile_error(CODE_PATH)
+
+    return game_code, game_data, description, error
+
+
+
+
+@app.get("/spec")
+async def get_spec():
+    if os.path.exists(SPEC_PATH):
+        with open(SPEC_PATH, 'r', encoding='utf-8') as f:
+            spec = f.read()
+
+    # 최신 사양서(문자열) 반환
+    markdown = spec
+    # 프런트는 onMarkdownUpdate(specRes.data)를 호출하므로 문자열이면 충분
+    return markdown
+
+
+MAX_ATTEMPTS = 5
 
 @app.post("/process-code")
 async def process_code(request: CodeRequest):
     """코드 처리 엔드포인트"""
     try:
-        code = remove_comments_from_file(CODE_PATH)
-        
-        if code == "":
-            prompt = f"{request.message} 이 것은 하나의 TypeScript 파일로 구동되는 게임을 만들기 위한 요청입니다. 게임은 'gameCanvas'에 표시되어야 합니다. 게임 코드를 생성하고 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요."
-        else:
-            prompt = f"{request.message} 이 것은 아래의 코드에 대한 수정요청이에요. 어떤 수정사항이 있었는지 간단히 설명도 해주세요. 응답 텍스트에서 코드부분을 명확히 알 수 있도록 반드시 수정된 코드의 시작부분에 '<<<code_start>>>'를, 끝부분에는 '<<<code_end>>>'를 적어주세요.\n\n{code}"
+        game_code, game_data, description, error = modify_code(request.message)  
 
-        # 💡 config 객체를 생성하여 응답 형식을 JSON으로 지정합니다.
-        config = types.GenerateContentConfig(
-            response_mime_type="application/json"
-        )
-        
-        # 모델 호출 및 응답 생성
-        print(f"AI 모델이 작업 중 입니다: {model_name}...")
-        response = gemini_client.models.generate_content(
-            model=model_name,
-            #config = config,
-            contents=prompt
-        )
+        if error != "":
+            for i in range(MAX_ATTEMPTS):    
+                game_code, game_data, description, error = modify_code(error) 
+                
+                if error == "":
+                    # 에러가 빈 문자열이라면 (에러 해결 성공)
+                    print(f"🎉 컴파일 성공! 에러가 해결되었습니다. (총 {i + 1}회 시도)")
+                    #final_error = "" # 최종 에러 상태를 성공으로 기록
+                    break # 반복문을 즉시 중단하고 빠져나옴
+                else:
+                    # 에러가 있다면 (에러 해결 실패)
+                    print(f"❌ 컴파일 에러 발생: {error}")
+                    #final_error = error # 최종 에러 상태를 실패로 기록
 
-        code_content, non_code_text = split_gemini_response_code(response.text)
-
-        if code_content is not None:
-            # 이전 버전 백업
-            if code != "":
-                with open(OLD_VERSION, 'w', encoding='utf-8') as f:
-                    f.write(code)
-
-            # 새 코드 저장
-            with open(CODE_PATH, 'w', encoding='utf-8') as f:
-                f.write(code_content)
-            
-            # 주석 제거된 버전 저장
-            if CODE_PATH_NOCOMMENT != "":
-                with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
-                    f.write(remove_comments_from_file(CODE_PATH_NOCOMMENT))
-
-            # return {
-            #     "status": "success",
-            #     "code": code_content,
-            #     "explanation": non_code_text
-            # }
-            return {
-                "status": "success",
-                "code": code_content,
-                "reply": non_code_text
-            }
-        else:
-            raise HTTPException(status_code=400, detail="코드 생성에 실패했습니다.")
-
+        return {
+            "status": "success",
+            "code": game_code,
+            "data": game_data,
+            "reply": description
+        }
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/client-error")
@@ -270,23 +557,141 @@ async def log_client_error(error_data: ClientError):
     return {"status": "success", "message": "Error logged successfully"}
 
 
+
 qtp = QuestionTemplateProcessor()
-atp = AnswerTemplateProcessor()
 
 @app.post("/question")
 async def process_code(request: CodeRequest):
     try:        
-        history = format_chat_history(get_session_history(0))
+        history = ""#format_chat_history(get_session_history(0))
         specification = ""
         prompt = qtp.get_final_prompt(history, request.message, specification)
 
+        print(f"AI 모델이 작업 중 입니다: {model_name}...")
+        response = gemini_client.models.generate_content(
+            model=model_name,
+            #config = config,
+            contents=prompt
+        )
+
         return {
-            "reply": prompt
+            "reply": remove_code_fences_safe(response.text)
         }
 
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class QuestionAnswer(BaseModel):
+    question: str
+    answer: str
+
+class AdditionalRequest(BaseModel):
+    request: str
+
+class ChatData(BaseModel):
+    mainQuestions: List[QuestionAnswer]
+    additionalRequests: List[AdditionalRequest]
+    
+
+
+
+def format_json_to_string(data):
+    """
+    주어진 JSON 데이터를 '질문x: ...\n답변x: ...\n추가요청x: ...' 형식의 문자열로 변환합니다.
+    """
+    output_lines = []
+    
+    # 1. mainQuestions 처리 (질문과 답변)
+    for i, item in enumerate(data.get('mainQuestions', [])):
+        question_num = i + 1
+        
+        # 'question' 키는 항상 존재한다고 가정
+        question = item.get('question', '질문 없음')
+        
+        # 'answer' 키가 있으면 사용하고, 없으면 빈 문자열 또는 특정 문구를 사용
+        # 원본 JSON에는 첫 번째 질문에 'answer' 키가 없으므로, 코드 실행을 위해 'answer': '없음'을 임시로 추가했습니다.
+        answer = item.get('answer', '미입력')
+        
+        output_lines.append(f"질문{question_num}: {question}")
+        output_lines.append(f"답변{question_num}: {answer}")
+        output_lines.append("") # 줄바꿈 추가
+        
+    # 질문/답변 섹션과 추가 요청 섹션을 시각적으로 구분
+    if output_lines and data.get('additionalRequests'):
+        output_lines.append("") # 줄바꿈 추가
+        
+    # 2. additionalRequests 처리 (추가 요청)
+    for i, item in enumerate(data.get('additionalRequests', [])):
+        request_num = i + 1
+        # 'request' 키는 항상 존재한다고 가정
+        request = item.get('request', '요청 내용 없음')
+        
+        output_lines.append(f"추가요청{request_num}: {request}")
+        output_lines.append("") # 줄바꿈 추가
+        
+    # 모든 라인을 줄바꿈 문자('\n')로 연결하여 최종 문자열 생성
+    return "\n".join(output_lines)
+
+
+atp = AnswerTemplateProcessor()
+    
+
+
+@app.post("/test")
+async def process_chat_data(data: str = Body(...)):
+    # 문자열로 받은 JSON 데이터를 파싱
+    import json
+    chat_data = json.loads(data)
+
+    print(chat_data)
+
+    result = format_json_to_string(chat_data)
+
+    print(result)
+
+    old_spec = ""
+    if os.path.exists(SPEC_PATH):
+        with open(SPEC_PATH, 'r', encoding='utf-8') as f:
+            old_spec = f.read()
+
+    prompt = atp.get_final_prompt(old_spec, result)
+
+    print(f"AI 모델이 작업 중 입니다: {model_name}...")
+    response = gemini_client.models.generate_content(
+            model=model_name,
+            #config = config,
+            contents=prompt
+        )
+
+    print(response.text)
+
+    parse = parse_ai_response2(response.text)
+    spec = parse['specification']
+
+    directory_path = os.path.dirname(SPEC_PATH) 
+    if directory_path:
+        os.makedirs(directory_path, exist_ok=True)
+
+    with open(SPEC_PATH, 'w', encoding='utf-8') as f:
+        f.write(spec)
+
+    history = ""#format_chat_history(get_session_history(0))
+    prompt = qtp.get_final_prompt(history, "", spec)
+
+    print(f"AI 모델이 작업 중 입니다: {model_name}...")
+    response = gemini_client.models.generate_content(
+        model=model_name,
+        #config = config,
+        contents=prompt
+    )
+
+    return {
+                "status": "success",
+                "message": "답변이 성공적으로 처리되었습니다.",                
+                "reply": remove_code_fences_safe(response.text)
+            }
 
 
 
@@ -312,13 +717,20 @@ async def process_code(request: CodeRequest):
 async def revert_code():
     """코드를 이전 버전으로 되돌리는 엔드포인트"""
     try:
-        if os.path.exists(OLD_VERSION):
-            with open(OLD_VERSION, 'r', encoding='utf-8') as f:
+        if os.path.exists(OLD_CODE):
+            with open(OLD_CODE, 'r', encoding='utf-8') as f:
                 old_code = f.read()
             
             with open(CODE_PATH, 'w', encoding='utf-8') as f:
                 f.write(old_code)
             
+            if os.path.exists(OLD_DATA):
+                with open(OLD_DATA, 'r', encoding='utf-8') as f:
+                    old_code = f.read()
+                
+                with open(DATA_PATH, 'w', encoding='utf-8') as f:
+                    f.write(old_code)
+
             return {"status": "success", "reply": "코드를 이전 버전으로 되돌렸습니다."}
         else:
             return {"status": "success", "reply": "되돌릴 코드가 없습니다."}
