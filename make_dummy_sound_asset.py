@@ -50,7 +50,7 @@ json_str = '''{
 }'''
 
 # 2. 설정 변수
-DUMMY_DIR = 'dummy_sound'   # 더미 사운드 파일이 있는 폴더
+DUMMY_DIR = 'dummy_data/dummy_sound'   # 더미 사운드 파일이 있는 폴더
 #TARGET_DIR = 'assets' # 사운드 파일이 복사될 타겟 폴더
 TARGET_DIR = os.path.dirname(os.path.abspath(__file__)) # 현재 스크립트 디렉토리
 DUMMY_BGM = os.path.join(DUMMY_DIR, 'bgm.mp3') # 더미 BGM 파일 경로

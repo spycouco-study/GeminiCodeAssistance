@@ -5,12 +5,13 @@ from google import genai
 from google.genai import types
 import os
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from realtime import List
 
 from classes import AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor
+from make_default_game_folder import create_project_structure
 from make_dummy_image_asset_copy_2 import check_and_create_images_with_text
 from make_dummy_sound_asset import copy_and_rename_sound_files
 from tools.debug_print import debug_print
@@ -52,6 +53,7 @@ model_name = "gemini-2.5-flash"
 # 요청 모델 정의
 class CodeRequest(BaseModel):
     message: str
+    game_name: str
 
 # 서버 상태 체크를 위한 헬스체크 엔드포인트
 @app.get("/")
@@ -213,20 +215,60 @@ BASE_PUBLIC_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTe
 # 'C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion'
 BASE_OLD_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion")
 
-# --- 최종 경로 정의 ---
+# # --- 최종 경로 정의 ---
 
-# 현재 버전 경로 (BASE_PUBLIC_DIR / GAME_NAME)
-GAME_DIR = BASE_PUBLIC_DIR / GAME_NAME
-CODE_PATH = GAME_DIR / "game.ts"
-DATA_PATH = GAME_DIR / "data.json"
-SPEC_PATH = GAME_DIR / "spec.md"
-ASSETS_PATH = GAME_DIR / "assets"
+# # 현재 버전 경로 (BASE_PUBLIC_DIR / GAME_NAME)
+# GAME_DIR = BASE_PUBLIC_DIR / GAME_NAME
+# CODE_PATH = BASE_PUBLIC_DIR / GAME_NAME / "game.ts"
+# DATA_PATH = BASE_PUBLIC_DIR / GAME_NAME / "data.json"
+# SPEC_PATH = BASE_PUBLIC_DIR / GAME_NAME / "spec.md"
+# ASSETS_PATH = BASE_PUBLIC_DIR / GAME_NAME / "assets"
+
+# # 이전 버전 경로 (BASE_OLD_DIR / GAME_NAME)
+# OLD_GAME_DIR = BASE_OLD_DIR / GAME_NAME
+# OLD_CODE = BASE_OLD_DIR / GAME_NAME / "(old)game.ts"
+# OLD_DATA = BASE_OLD_DIR / GAME_NAME / "(old)data.json"
+CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\GameFolder\src\bear block game(nocomment).ts")
+
+
+
+
+
+
+
+
+def GAME_DIR(game_name:str):
+    return BASE_PUBLIC_DIR / game_name
+
+def CODE_PATH(game_name:str):
+    return BASE_PUBLIC_DIR / game_name / "game.ts"
+
+def DATA_PATH(game_name:str):
+    return BASE_PUBLIC_DIR / game_name / "data.json"
+
+def SPEC_PATH(game_name:str):
+    return BASE_PUBLIC_DIR / game_name / "spec.md"
+
+# def ASSETS_PATH(game_name:str):
+#     return BASE_PUBLIC_DIR / game_name / "assets"
+
+
 
 # 이전 버전 경로 (BASE_OLD_DIR / GAME_NAME)
-OLD_GAME_DIR = BASE_OLD_DIR / GAME_NAME
-OLD_CODE = OLD_GAME_DIR / "(old)game.ts"
-OLD_DATA = OLD_GAME_DIR / "(old)data.json"
-CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\GameFolder\src\bear block game(nocomment).ts")
+def OLD_GAME_DIR(game_name:str):
+    return BASE_OLD_DIR / game_name
+
+def OLD_CODE(game_name:str):
+    return BASE_OLD_DIR / game_name / "(old)game.ts"
+
+def OLD_DATA(game_name:str):
+    return BASE_OLD_DIR / game_name / "(old)data.json"
+
+
+
+
+
+
 
 
 
@@ -274,7 +316,7 @@ async def category(request: CodeRequest):
 
 
 def describe_code(request: CodeRequest):
-    code = remove_comments_from_file(CODE_PATH)
+    code = remove_comments_from_file(CODE_PATH(request.game_name))
     
     if code == "":
         return "분석할 코드가 없습니다."
@@ -382,18 +424,21 @@ def validate_json(json_str):
     
 
 
-def modify_code(request):
+def modify_code(request, game_name):
     """코드 처리 엔드포인트"""
     #original_code = remove_comments_from_file(CODE_PATH)
 
-    if os.path.exists(CODE_PATH):
-        with open(CODE_PATH, 'r', encoding='utf-8') as f:
+    if not os.path.exists(GAME_DIR(game_name)):
+        create_project_structure(GAME_DIR(game_name))
+
+    if os.path.exists(CODE_PATH(game_name)):
+        with open(CODE_PATH(game_name), 'r', encoding='utf-8') as f:
             original_code = f.read()
     else:
         original_code = ""
 
-    if os.path.exists(DATA_PATH):
-        with open(DATA_PATH, 'r', encoding='utf-8') as f:
+    if os.path.exists(DATA_PATH(game_name)):
+        with open(DATA_PATH(game_name), 'r', encoding='utf-8') as f:
             original_data = f.read()
     else:
         original_data = ""
@@ -433,44 +478,44 @@ def modify_code(request):
     json_data = json.loads(game_data)
     print(json_data.get('assets', {}))
 
-    check_and_create_images_with_text(json_data, GAME_DIR)
-    copy_and_rename_sound_files(json_data, GAME_DIR)
+    check_and_create_images_with_text(json_data, GAME_DIR(game_name))
+    copy_and_rename_sound_files(json_data, GAME_DIR(game_name))
     description = remove_code_fences_safe(responseData['description'])
     #split_gemini_response_code(response.text)
 
     if game_code is not None:
         # 이전 버전 백업
         if original_code != "":
-            directory_path = os.path.dirname(OLD_CODE) 
+            directory_path = os.path.dirname(OLD_CODE(game_name)) 
             if directory_path:
                 os.makedirs(directory_path, exist_ok=True)
 
-            with open(OLD_CODE, 'w', encoding='utf-8') as f:
+            with open(OLD_CODE(game_name), 'w', encoding='utf-8') as f:
                 f.write(original_code)
 
         if original_data != "":            
-            directory_path = os.path.dirname(OLD_DATA) 
+            directory_path = os.path.dirname(OLD_DATA(game_name)) 
             if directory_path:
                 os.makedirs(directory_path, exist_ok=True)
 
-            with open(OLD_DATA, 'w', encoding='utf-8') as f:
+            with open(OLD_DATA(game_name), 'w', encoding='utf-8') as f:
                 f.write(original_data)
 
 
 
         # 새 코드 저장          
-        directory_path = os.path.dirname(CODE_PATH) 
+        directory_path = os.path.dirname(CODE_PATH(game_name)) 
         if directory_path:
             os.makedirs(directory_path, exist_ok=True)
 
-        with open(CODE_PATH, 'w', encoding='utf-8') as f:  
+        with open(CODE_PATH(game_name), 'w', encoding='utf-8') as f:  
             f.write(game_code)
               
-        directory_path = os.path.dirname(DATA_PATH) 
+        directory_path = os.path.dirname(DATA_PATH(game_name)) 
         if directory_path:
             os.makedirs(directory_path, exist_ok=True)
 
-        with open(DATA_PATH, 'w', encoding='utf-8') as f:  
+        with open(DATA_PATH(game_name), 'w', encoding='utf-8') as f:  
             f.write(game_data)
 
 
@@ -481,9 +526,9 @@ def modify_code(request):
                 f.write(remove_comments_from_file(CODE_PATH_NOCOMMENT))
 
         if error == "":
-            error = check_typescript_compile_error(CODE_PATH)
+            error = check_typescript_compile_error(CODE_PATH(game_name))
         else:
-            error = error + '\n' + check_typescript_compile_error(CODE_PATH)
+            error = error + '\n' + check_typescript_compile_error(CODE_PATH(game_name))
 
     return game_code, game_data, description, error
 
@@ -491,9 +536,9 @@ def modify_code(request):
 
 
 @app.get("/spec")
-async def get_spec():
-    if os.path.exists(SPEC_PATH):
-        with open(SPEC_PATH, 'r', encoding='utf-8') as f:
+async def get_spec(game_name: str):
+    if os.path.exists(SPEC_PATH(game_name)):
+        with open(SPEC_PATH(game_name), 'r', encoding='utf-8') as f:
             spec = f.read()
 
     # 최신 사양서(문자열) 반환
@@ -508,11 +553,11 @@ MAX_ATTEMPTS = 5
 async def process_code(request: CodeRequest):
     """코드 처리 엔드포인트"""
     try:
-        game_code, game_data, description, error = modify_code(request.message)  
+        game_code, game_data, description, error = modify_code(request.message, request.game_name)  
 
         if error != "":
             for i in range(MAX_ATTEMPTS):    
-                game_code, game_data, description, error = modify_code(error) 
+                game_code, game_data, description, error = modify_code(error, request.game_name) 
                 
                 if error == "":
                     # 에러가 빈 문자열이라면 (에러 해결 성공)
@@ -639,11 +684,29 @@ atp = AnswerTemplateProcessor()
     
 
 
-@app.post("/test")
-async def process_chat_data(data: str = Body(...)):
-    # 문자열로 받은 JSON 데이터를 파싱
-    import json
-    chat_data = json.loads(data)
+from typing import Any, Dict
+
+# 기존 submitData의 구조에 맞춰 payload 필드를 정의합니다.
+# payload 내용이 복잡하거나 명확하지 않다면 Dict[str, Any]로 설정할 수 있습니다.
+# class SubmitPayload(BaseModel):
+#     # submitData의 원래 필드들을 여기에 정의합니다.
+#     # 예시:
+#     # prompt: str
+#     # answer: str
+#     # group_index: int
+#     # 정확한 구조를 모를 경우 Dict[str, Any]로 처리
+#     __root__: Dict[str, Any]
+
+# 💡 상위 계층 구조를 정의하는 메인 모델
+class WrappedSubmitData(BaseModel):
+    game_name: str
+    payload: str
+
+@app.post("/qna")
+async def process_chat_data(data: WrappedSubmitData):   #      game_name: str, data: str = Body(...)):
+    # Pydantic 모델을 통해 깔끔하게 데이터 접근
+    game_name = data.game_name
+    chat_data = json.loads(data.payload)
 
     print(chat_data)
 
@@ -652,8 +715,8 @@ async def process_chat_data(data: str = Body(...)):
     print(result)
 
     old_spec = ""
-    if os.path.exists(SPEC_PATH):
-        with open(SPEC_PATH, 'r', encoding='utf-8') as f:
+    if os.path.exists(SPEC_PATH(game_name)):
+        with open(SPEC_PATH(game_name), 'r', encoding='utf-8') as f:
             old_spec = f.read()
 
     prompt = atp.get_final_prompt(old_spec, result)
@@ -670,11 +733,11 @@ async def process_chat_data(data: str = Body(...)):
     parse = parse_ai_response2(response.text)
     spec = parse['specification']
 
-    directory_path = os.path.dirname(SPEC_PATH) 
+    directory_path = os.path.dirname(SPEC_PATH(game_name)) 
     if directory_path:
         os.makedirs(directory_path, exist_ok=True)
 
-    with open(SPEC_PATH, 'w', encoding='utf-8') as f:
+    with open(SPEC_PATH(game_name), 'w', encoding='utf-8') as f:
         f.write(spec)
 
     history = ""#format_chat_history(get_session_history(0))
@@ -714,21 +777,21 @@ async def process_code(request: CodeRequest):
 
 # /revert 엔드포인트 추가
 @app.post("/revert")
-async def revert_code():
+async def revert_code(game_name):
     """코드를 이전 버전으로 되돌리는 엔드포인트"""
     try:
-        if os.path.exists(OLD_CODE):
-            with open(OLD_CODE, 'r', encoding='utf-8') as f:
+        if os.path.exists(OLD_CODE(game_name)):
+            with open(OLD_CODE(game_name), 'r', encoding='utf-8') as f:
                 old_code = f.read()
             
-            with open(CODE_PATH, 'w', encoding='utf-8') as f:
+            with open(CODE_PATH(game_name), 'w', encoding='utf-8') as f:
                 f.write(old_code)
             
-            if os.path.exists(OLD_DATA):
-                with open(OLD_DATA, 'r', encoding='utf-8') as f:
+            if os.path.exists(OLD_DATA(game_name)):
+                with open(OLD_DATA(game_name), 'r', encoding='utf-8') as f:
                     old_code = f.read()
                 
-                with open(DATA_PATH, 'w', encoding='utf-8') as f:
+                with open(DATA_PATH(game_name), 'w', encoding='utf-8') as f:
                     f.write(old_code)
 
             return {"status": "success", "reply": "코드를 이전 버전으로 되돌렸습니다."}
