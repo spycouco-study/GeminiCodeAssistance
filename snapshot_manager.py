@@ -157,7 +157,9 @@ def check_version_exists(archive_root: Path, version_name: str) -> bool:
     return (archive_root / version_name).is_dir()
 
 # 주요 함수
-def create_version(root: Path, ignore_patterns, parent_name = None, chat=None, summary=""):
+def create_version(root: Path, parent_name = None, chat=None, summary=""):
+    ignore_patterns = DEFAULT_IGNORE.copy()
+
     archive_root = root / ARCHIVE_DIRNAME
     archive_root.mkdir(exist_ok=True)
     
@@ -302,12 +304,12 @@ def create_version(root: Path, ignore_patterns, parent_name = None, chat=None, s
 
     print(f"Created version {version_name} at {version_dir}")
 
-    update_change_log(root, version_name, summary, parent_name=parent_name, is_current=True)
+    append_change_log(root, version_name, summary, parent_name=parent_name, is_current=True)
 
     return version_name
 
 ### 보조
-def update_change_log(root: Path, version_name, summary, parent_name=None, is_current=True):
+def append_change_log(root: Path, version_name, summary, parent_name=None, is_current=True):
     log_path = root / ARCHIVE_DIRNAME / "change_log.json"
     if log_path.exists():
         log_data = json.loads(log_path.read_text(encoding="utf-8"))
@@ -475,12 +477,66 @@ def restore_version(root: Path, version_name: str, overwrite=True):
             else:
                 if dst.exists():
                     dst.unlink()  # 기존 파일을 먼저 제거 (명시적 덮어쓰기)
-                shutil.copy2(p, dst)
+                shutil.copy(p, dst)
 
     shutil.rmtree(restore_tmp)
+    
+    log_path = root / ARCHIVE_DIRNAME / "change_log.json"
+    if log_path.exists():
+        log_data = json.loads(log_path.read_text(encoding="utf-8"))
+    else:
+        log_data = {"versions": []}
+
+    # 이전 최신 버전은 is_latest=False로
+    for v in log_data["versions"]:
+        if v["version"] == version_name:
+            v["is_current"] = True
+        else:            
+            v["is_current"] = False
+
+    log_path.write_text(json.dumps(log_data, indent=4, ensure_ascii=False), encoding="utf-8")
+
     print(f"✅ Restore complete: {version_name}")
     return True
 
+
+
+def find_current_version_from_file(file_path: str) -> str:
+    """
+    주어진 경로의 JSON 파일에서 'is_current' 필드가 True인 버전 정보를 찾아 반환합니다.
+
+    Args:
+        file_path (str): 읽어올 JSON 파일의 경로입니다.
+    """
+    
+    file = Path(file_path)
+    
+    # 1. 파일 존재 여부 확인
+    if not file.exists():
+        print(f"❌ 오류: 파일 경로를 찾을 수 없습니다: {file_path}")
+        return None
+    
+    try:
+        # 2. 파일 읽기 및 JSON 파싱
+        # with open을 사용하여 파일을 안전하게 열고 닫습니다.
+        with open(file, 'r', encoding='utf-8') as f:
+            data = json.load(f) # json.load()는 파일 객체에서 직접 JSON을 읽어 파싱합니다.
+            
+        # 3. 'versions' 리스트에서 현재 버전 찾기
+        for version_info in data.get("versions", []):
+            if version_info.get("is_current") is True:
+                # 4. 찾은 버전을 반환
+                return version_info.get("version")
+        
+        # 5. 찾지 못한 경우 None 반환
+        return None
+        
+    except json.JSONDecodeError:
+        print(f"❌ 오류: 파일 '{file_path}'의 내용이 유효한 JSON 형식이 아닙니다.")
+        return None
+    except Exception as e:
+        print(f"❌ 오류가 발생했습니다: {e}")
+        return None
 
 
 
@@ -537,7 +593,7 @@ def main():
         else:
             parent = None
 
-        version = create_version(root, ignore, chat=chat, parent_name=parent, summary=args.summary)
+        version = create_version(root, chat=chat, parent_name=parent, summary=args.summary)
         print("Version created:", version)
     elif args.cmd == 'list':
         list_versions(root)
@@ -553,15 +609,23 @@ def main():
 
 
 root = Path(r"C:\Users\UserK\Desktop\final project\snapshot_test") / "test"
-ignore = DEFAULT_IGNORE.copy()
+#root = Path.cwd() / "snapshot_test" / "test"
+#ignore = DEFAULT_IGNORE.copy()
 
 
 
 
-#create_version(root, ignore)
-create_version(root, ignore, parent_name="v3-1")
+# create_version(root)
+#create_version(root, parent_name="v1-1")
 
 
 
 
-#restore_version(root, "v1-1")
+#restore_version(root, "v2-1")
+
+
+
+
+
+
+#find_current_version_from_file(r"C:\Users\UserK\Desktop\final project\snapshot_test\test\archive\change_log.json")

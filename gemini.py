@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import re
+from fastapi.responses import JSONResponse
 from google import genai
 from google.genai import types
 import os
@@ -14,6 +15,7 @@ from classes import AnswerTemplateProcessor, ClientError, MakePromptTemplateProc
 from make_default_game_folder import create_project_structure
 from make_dummy_image_asset_copy_2 import check_and_create_images_with_text
 from make_dummy_sound_asset import copy_and_rename_sound_files
+from snapshot_manager import create_version, find_current_version_from_file, restore_version
 from tools.debug_print import debug_print
 from tsc import check_typescript_compile_error
 #from supabase import format_chat_history, get_session_history
@@ -249,8 +251,8 @@ def DATA_PATH(game_name:str):
 def SPEC_PATH(game_name:str):
     return BASE_PUBLIC_DIR / game_name / "spec.md"
 
-# def ASSETS_PATH(game_name:str):
-#     return BASE_PUBLIC_DIR / game_name / "assets"
+def ARCHIVE_LOG_PATH(game_name:str):
+     return BASE_PUBLIC_DIR / game_name / "archive" / "change_log.json"
 
 
 
@@ -551,6 +553,12 @@ MAX_ATTEMPTS = 5
 
 @app.post("/process-code")
 async def process_code(request: CodeRequest):
+
+    is_first_created = False
+
+    if not os.path.exists(CODE_PATH(request.game_name)):
+        is_first_created = True
+
     """코드 처리 엔드포인트"""
     try:
         game_code, game_data, description, error = modify_code(request.message, request.game_name)  
@@ -569,6 +577,12 @@ async def process_code(request: CodeRequest):
                     print(f"❌ 컴파일 에러 발생: {error}")
                     #final_error = error # 최종 에러 상태를 실패로 기록
 
+        if is_first_created:
+            create_version(GAME_DIR(request.game_name))
+        else:
+            current_ver = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
+            create_version(GAME_DIR(request.game_name), parent_name=current_ver)
+
         return {
             "status": "success",
             "code": game_code,
@@ -578,6 +592,78 @@ async def process_code(request: CodeRequest):
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# 클라이언트가 전송하는 JSON 본문 구조
+class RestoreRequest(BaseModel):
+    version: str          # 복원할 버전 이름 (예: "v4-4")
+    game_name: str
+
+@app.post("/restore-version")
+async def restore_version_request(request_data: RestoreRequest):    
+    # 1. Pydantic 모델을 통해 데이터 추출 (자동으로 유효성 검사 완료)
+    version_to_restore = request_data.version
+    game_name = request_data.game_name
+    
+    if not version_to_restore:
+        # 버전 이름이 필수이므로 누락 시 400 Bad Request 반환
+        raise HTTPException(
+            status_code=400, 
+            detail="복원할 버전(version) 정보가 누락되었습니다."
+        )
+
+    restore_success = restore_version(GAME_DIR(game_name), version_to_restore)
+    
+    # 3. 결과 반환
+    if restore_success:
+        return JSONResponse(content={
+            "status": "success",
+            "message": f"'{game_name}'의 버전 '{version_to_restore}' 복원이 성공적으로 요청되었습니다."
+        }, status_code=200)
+    else:
+        # 복원 로직이 실패했다고 가정하고 500 오류 반환
+        raise HTTPException(
+            status_code=500,
+            detail=f"'{game_name}'의 버전 '{version_to_restore}' 복원 중 서버 오류가 발생했습니다."
+        )
+    
+
+@app.get("/snapshot-log")
+async def get_snapshot_log(game_name: str):    
+    SNAPSHOT_LOG_PATH = ARCHIVE_LOG_PATH(game_name)
+    # 1. 파일 존재 여부 확인
+    if not SNAPSHOT_LOG_PATH.exists():
+        # 파일이 없을 경우 404 (Not Found) 오류를 반환
+        raise HTTPException(
+            status_code=404, 
+            detail=f"스냅샷 로그 파일이 존재하지 않습니다: {SNAPSHOT_LOG_PATH}"
+        )
+    
+    try:
+        # 2. JSON 파일 읽기 및 파싱
+        # with open을 사용하여 파일을 안전하게 열고 닫습니다.
+        with open(SNAPSHOT_LOG_PATH, 'r', encoding='utf-8') as f:
+            # json.load()를 사용하여 파일 내용을 파이썬 딕셔너리로 변환합니다.
+            snapshot_data = json.load(f)
+        
+        # 3. 데이터 반환
+        # FastAPI는 파이썬 딕셔너리(snapshot_data)를 받으면 
+        # Content-Type: application/json 헤더와 함께 JSON 문자열로 자동 변환하여 전송합니다.
+        return snapshot_data
+        
+    except json.JSONDecodeError:
+        # 파일 내용이 JSON 형식이 아닐 경우 500 (Internal Server Error) 오류 반환
+        raise HTTPException(
+            status_code=500, 
+            detail="스냅샷 로그 파일의 내용이 유효한 JSON 형식이 아닙니다."
+        )
+    except Exception as e:
+        # 기타 파일 접근 오류 발생 시
+        raise HTTPException(
+            status_code=500, 
+            detail=f"파일을 읽는 중 알 수 없는 오류가 발생했습니다: {e}"
+        )
+
 
 
 
