@@ -470,41 +470,35 @@ def modify_code(request, game_name):
 
     game_code = remove_code_fences_safe(responseData['game_code'])
     game_data = remove_code_fences_safe(responseData['game_data'])
+    description = remove_code_fences_safe(responseData['description'])
     #asset_list = remove_code_fences_safe(responseData['asset_list'])
     # asset_list = json.loads(asset_list)
     # print(asset_list)
     # check_and_create_images(asset_list, ASSETS_PATH)
-    
-    error = validate_json(game_data)
 
-    json_data = json.loads(game_data)
-    print(json_data.get('assets', {}))
-
-    check_and_create_images_with_text(json_data, GAME_DIR(game_name))
-    copy_and_rename_sound_files(json_data, GAME_DIR(game_name))
-    description = remove_code_fences_safe(responseData['description'])
     #split_gemini_response_code(response.text)
 
-    if game_code is not None:
-        # 이전 버전 백업
-        if original_code != "":
-            directory_path = os.path.dirname(OLD_CODE(game_name)) 
-            if directory_path:
-                os.makedirs(directory_path, exist_ok=True)
+    # if game_code is not None:
+    #     # 이전 버전 백업
+    #     if original_code != "":
+    #         directory_path = os.path.dirname(OLD_CODE(game_name)) 
+    #         if directory_path:
+    #             os.makedirs(directory_path, exist_ok=True)
 
-            with open(OLD_CODE(game_name), 'w', encoding='utf-8') as f:
-                f.write(original_code)
+    #         with open(OLD_CODE(game_name), 'w', encoding='utf-8') as f:
+    #             f.write(original_code)
 
-        if original_data != "":            
-            directory_path = os.path.dirname(OLD_DATA(game_name)) 
-            if directory_path:
-                os.makedirs(directory_path, exist_ok=True)
+    #     if original_data != "":            
+    #         directory_path = os.path.dirname(OLD_DATA(game_name)) 
+    #         if directory_path:
+    #             os.makedirs(directory_path, exist_ok=True)
 
-            with open(OLD_DATA(game_name), 'w', encoding='utf-8') as f:
-                f.write(original_data)
+    #         with open(OLD_DATA(game_name), 'w', encoding='utf-8') as f:
+    #             f.write(original_data)
 
+    modify_check = ""
 
-
+    if game_code is not None and game_code != '':
         # 새 코드 저장          
         directory_path = os.path.dirname(CODE_PATH(game_name)) 
         if directory_path:
@@ -512,7 +506,23 @@ def modify_code(request, game_name):
 
         with open(CODE_PATH(game_name), 'w', encoding='utf-8') as f:  
             f.write(game_code)
-              
+
+        modify_check = "< game.ts : 수정 O >\n"
+    else:
+        modify_check = "< game.ts : 수정 X >\n"
+
+            
+
+    error = ""
+    if game_data is not None and game_data != '':    
+        error = validate_json(game_data)
+
+        json_data = json.loads(game_data)
+        print(json_data.get('assets', {}))
+
+        check_and_create_images_with_text(json_data, GAME_DIR(game_name))
+        copy_and_rename_sound_files(json_data, GAME_DIR(game_name))
+
         directory_path = os.path.dirname(DATA_PATH(game_name)) 
         if directory_path:
             os.makedirs(directory_path, exist_ok=True)
@@ -520,17 +530,22 @@ def modify_code(request, game_name):
         with open(DATA_PATH(game_name), 'w', encoding='utf-8') as f:  
             f.write(game_data)
 
+        modify_check = modify_check + "< data.json : 수정 O >\n"
+    else:
+        modify_check = modify_check + "< data.json : 수정 X >\n"
 
 
-        # 주석 제거된 버전 저장
-        if CODE_PATH_NOCOMMENT != "":
-            with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
-                f.write(remove_comments_from_file(CODE_PATH_NOCOMMENT))
+    description = modify_check + description
 
-        if error == "":
-            error = check_typescript_compile_error(CODE_PATH(game_name))
-        else:
-            error = error + '\n' + check_typescript_compile_error(CODE_PATH(game_name))
+    # 주석 제거된 버전 저장
+    if CODE_PATH_NOCOMMENT != "":
+        with open(CODE_PATH_NOCOMMENT, 'w', encoding='utf-8') as f:
+            f.write(remove_comments_from_file(CODE_PATH_NOCOMMENT))
+
+    if error == "":
+        error = check_typescript_compile_error(CODE_PATH(game_name))
+    else:
+        error = error + '\n' + check_typescript_compile_error(CODE_PATH(game_name))
 
     return game_code, game_data, description, error
 
@@ -561,26 +576,29 @@ async def process_code(request: CodeRequest):
 
     """코드 처리 엔드포인트"""
     try:
-        game_code, game_data, description, error = modify_code(request.message, request.game_name)  
-
-        if error != "":
-            for i in range(MAX_ATTEMPTS):    
-                game_code, game_data, description, error = modify_code(error, request.game_name) 
+        message = request.message
+        for i in range(MAX_ATTEMPTS):    
+            try:
+                game_code, game_data, description, error = modify_code(message, request.game_name) 
                 
                 if error == "":
                     # 에러가 빈 문자열이라면 (에러 해결 성공)
-                    print(f"🎉 컴파일 성공! 에러가 해결되었습니다. (총 {i + 1}회 시도)")
+                    print(f"🎉 컴파일 성공! (총 {i + 1}회 시도)")
                     #final_error = "" # 최종 에러 상태를 성공으로 기록
                     break # 반복문을 즉시 중단하고 빠져나옴
                 else:
+                    message = error
                     # 에러가 있다면 (에러 해결 실패)
                     print(f"❌ 컴파일 에러 발생: {error}")
                     #final_error = error # 최종 에러 상태를 실패로 기록
+            except Exception as e:                
+                print(f"❌ 에러 발생: {e}")
 
         if is_first_created:
             create_version(GAME_DIR(request.game_name))
         else:
-            current_ver = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
+            version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
+            current_ver = version_info.get("version")
             create_version(GAME_DIR(request.game_name), parent_name=current_ver)
 
         return {
@@ -859,31 +877,43 @@ async def process_code(request: CodeRequest):
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
-
+class RevertRequest(BaseModel):
+    game_name: str
 
 # /revert 엔드포인트 추가
 @app.post("/revert")
-async def revert_code(game_name):
+async def revert_code(request: RevertRequest):
+    game_name = request.game_name
     """코드를 이전 버전으로 되돌리는 엔드포인트"""
-    try:
-        if os.path.exists(OLD_CODE(game_name)):
-            with open(OLD_CODE(game_name), 'r', encoding='utf-8') as f:
-                old_code = f.read()
-            
-            with open(CODE_PATH(game_name), 'w', encoding='utf-8') as f:
-                f.write(old_code)
-            
-            if os.path.exists(OLD_DATA(game_name)):
-                with open(OLD_DATA(game_name), 'r', encoding='utf-8') as f:
-                    old_code = f.read()
-                
-                with open(DATA_PATH(game_name), 'w', encoding='utf-8') as f:
-                    f.write(old_code)
+    try:        
+        version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(game_name))
+        parent_version = version_info.get("parent")
+        restore_success = restore_version(GAME_DIR(game_name), parent_version)
 
-            return {"status": "success", "reply": "코드를 이전 버전으로 되돌렸습니다."}
+        if restore_success:
+            return {"status": "success", "reply": f"코드를 {parent_version} 버전으로 되돌렸습니다."}
         else:
             return {"status": "success", "reply": "되돌릴 코드가 없습니다."}
-            #raise HTTPException(status_code=404, detail="되돌릴 코드가 없습니다.")
+
+
+        # if os.path.exists(OLD_CODE(game_name)):
+        #     with open(OLD_CODE(game_name), 'r', encoding='utf-8') as f:
+        #         old_code = f.read()
+            
+        #     with open(CODE_PATH(game_name), 'w', encoding='utf-8') as f:
+        #         f.write(old_code)
+            
+        #     if os.path.exists(OLD_DATA(game_name)):
+        #         with open(OLD_DATA(game_name), 'r', encoding='utf-8') as f:
+        #             old_code = f.read()
+                
+        #         with open(DATA_PATH(game_name), 'w', encoding='utf-8') as f:
+        #             f.write(old_code)
+
+        #     return {"status": "success", "reply": "코드를 이전 버전으로 되돌렸습니다."}
+        # else:
+        #     return {"status": "success", "reply": "되돌릴 코드가 없습니다."}
+        #     #raise HTTPException(status_code=404, detail="되돌릴 코드가 없습니다.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

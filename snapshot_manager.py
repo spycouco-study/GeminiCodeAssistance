@@ -526,7 +526,7 @@ def find_current_version_from_file(file_path: str) -> str:
         for version_info in data.get("versions", []):
             if version_info.get("is_current") is True:
                 # 4. 찾은 버전을 반환
-                return version_info.get("version")
+                return version_info#.get("version")
         
         # 5. 찾지 못한 경우 None 반환
         return None
