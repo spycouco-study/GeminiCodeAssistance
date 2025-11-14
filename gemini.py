@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 import os
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from realtime import List
@@ -15,6 +15,7 @@ from classes import AnswerTemplateProcessor, ClientError, MakePromptTemplateProc
 from make_default_game_folder import create_project_structure
 from make_dummy_image_asset_copy_2 import check_and_create_images_with_text
 from make_dummy_sound_asset import copy_and_rename_sound_files
+from save_chat import load_chat, save_chat
 from snapshot_manager import create_version, find_current_version_from_file, restore_version
 from tools.debug_print import debug_print
 from tsc import check_typescript_compile_error
@@ -250,6 +251,9 @@ def DATA_PATH(game_name:str):
 
 def SPEC_PATH(game_name:str):
     return BASE_PUBLIC_DIR / game_name / "spec.md"
+
+def CHAT_PATH(game_name:str):
+    return BASE_PUBLIC_DIR / game_name / "chat.json"
 
 def ARCHIVE_LOG_PATH(game_name:str):
      return BASE_PUBLIC_DIR / game_name / "archive" / "change_log.json"
@@ -564,6 +568,16 @@ async def get_spec(game_name: str):
     return markdown
 
 
+@app.get("/game_data")
+async def get_spec(game_name: str):
+    if os.path.exists(DATA_PATH(game_name)):
+         with open(DATA_PATH(game_name), 'r', encoding='utf-8') as f:
+            data = json.load(f) # json.load()는 파일 객체에서 직접 JSON을 읽어 파싱합니다.
+
+    # 데이터 (문자열) 반환
+    return data
+
+
 MAX_ATTEMPTS = 5
 
 @app.post("/process-code")
@@ -577,36 +591,60 @@ async def process_code(request: CodeRequest):
     """코드 처리 엔드포인트"""
     try:
         message = request.message
+        save_chat(CHAT_PATH(request.game_name), "user", message)
+
+        game_code = ""
+        game_data = ""
+        description_total = ""
+
+        success = False
+        fail_message = ""
         for i in range(MAX_ATTEMPTS):    
             try:
                 game_code, game_data, description, error = modify_code(message, request.game_name) 
+                description_total = description_total + description
                 
                 if error == "":
                     # 에러가 빈 문자열이라면 (에러 해결 성공)
                     print(f"🎉 컴파일 성공! (총 {i + 1}회 시도)")
                     #final_error = "" # 최종 에러 상태를 성공으로 기록
+                    success = True
                     break # 반복문을 즉시 중단하고 빠져나옴
                 else:
                     message = error
                     # 에러가 있다면 (에러 해결 실패)
                     print(f"❌ 컴파일 에러 발생: {error}")
                     #final_error = error # 최종 에러 상태를 실패로 기록
-            except Exception as e:                
-                print(f"❌ 에러 발생: {e}")
+                    description_total = description_total + "\n\n\n\n\n" + error + "\n\n\n\n\n"
+            except Exception as e:     
+                fail_message = f"❌ 에러 발생: {e}"           
+                print(fail_message)
 
-        if is_first_created:
-            create_version(GAME_DIR(request.game_name))
+        if success:
+            if is_first_created:
+                create_version(GAME_DIR(request.game_name))
+            else:
+                version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
+                current_ver = version_info.get("version")
+                create_version(GAME_DIR(request.game_name), parent_name=current_ver)
+                
+            save_chat(CHAT_PATH(request.game_name), "bot", description_total)
+
+            return {
+                "status": "success",
+                "code": game_code,
+                "data": game_data,
+                "reply": description_total
+            }
         else:
-            version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
-            current_ver = version_info.get("version")
-            create_version(GAME_DIR(request.game_name), parent_name=current_ver)
+            save_chat(CHAT_PATH(request.game_name), "bot", fail_message)
 
-        return {
-            "status": "success",
-            "code": game_code,
-            "data": game_data,
-            "reply": description
-        }
+            return {
+                "status": "fail",
+                "code": game_code,
+                "data": game_data,
+                "reply": fail_message
+            }
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -684,6 +722,37 @@ async def get_snapshot_log(game_name: str):
 
 
 
+@app.get("/load-chat")
+def load_chat_request(game_name: str = Query(..., min_length=1)):
+    # # 경로 안전화(간단)
+    # safe_name = "".join(c for c in game_name if c.isalnum() or c in "-_")
+    # path = DATA_ROOT / safe_name / "chat.json"
+
+    # if not path.is_file():
+    #     return {"chat": []}
+
+    try:
+        # with path.open(encoding="utf-8") as f:
+        #     data = json.load(f)
+        # chat = data.get("chat")
+
+        chat = load_chat(CHAT_PATH(game_name))
+        return chat
+    
+        # if not isinstance(chat, list):
+        #     return {"chat": []}
+
+        # # 선택: 최소 정규화(형식 보장)
+        # normalized = []
+        # for m in chat:
+        #     if isinstance(m, dict) and "from" in m and "text" in m:
+        #         frm = "user" if m["from"] == "user" else "bot"
+        #         normalized.append({"from": frm, "text": str(m["text"])})
+        # return {"chat": normalized}
+    except Exception:
+        return {"chat": []}
+
+
 
 @app.post("/client-error")
 async def log_client_error(error_data: ClientError):
@@ -712,9 +781,13 @@ qtp = QuestionTemplateProcessor()
 @app.post("/question")
 async def process_code(request: CodeRequest):
     try:        
+        old_spec = ""
+        if os.path.exists(SPEC_PATH(request.game_name)):
+            with open(SPEC_PATH(request.game_name), 'r', encoding='utf-8') as f:
+                old_spec = f.read()
+
         history = ""#format_chat_history(get_session_history(0))
-        specification = ""
-        prompt = qtp.get_final_prompt(history, request.message, specification)
+        prompt = qtp.get_final_prompt(history, request.message, old_spec)
 
         print(f"AI 모델이 작업 중 입니다: {model_name}...")
         response = gemini_client.models.generate_content(
@@ -789,6 +862,35 @@ atp = AnswerTemplateProcessor()
 
 
 from typing import Any, Dict
+
+
+
+class DataUpdatePayload(BaseModel):
+    game_name: str
+    data: Dict[str, Any]
+
+@app.post("/data-update")
+async def process_chat_data(update: DataUpdatePayload):
+    # Pydantic 모델을 통해 깔끔하게 데이터 접근
+    game_name = update.game_name
+    update_data = update.data
+
+    with open(DATA_PATH(game_name), 'w', encoding='utf-8') as f:
+        # 3. json.dump()를 사용하여 딕셔너리를 JSON 형식으로 파일에 씁니다.
+        # indent=4는 사람이 읽기 쉬운 형태로 정렬해줍니다.
+        json.dump(update_data, f, ensure_ascii=False, indent=4)
+        
+    version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(game_name))
+    current_ver = version_info.get("version")
+    create_version(GAME_DIR(game_name), parent_name=current_ver)
+
+    return {
+                "status": "success",
+                "message": "데이터 업데이트가 성공적으로 처리되었습니다.",     
+            }
+
+
+
 
 # 기존 submitData의 구조에 맞춰 payload 필드를 정의합니다.
 # payload 내용이 복잡하거나 명확하지 않다면 Dict[str, Any]로 설정할 수 있습니다.
@@ -891,7 +993,9 @@ async def revert_code(request: RevertRequest):
         restore_success = restore_version(GAME_DIR(game_name), parent_version)
 
         if restore_success:
-            return {"status": "success", "reply": f"코드를 {parent_version} 버전으로 되돌렸습니다."}
+            reply = f"코드를 {parent_version} 버전으로 되돌렸습니다."            
+            save_chat(CHAT_PATH(request.game_name), "bot", reply)
+            return {"status": "success", "reply": reply}
         else:
             return {"status": "success", "reply": "되돌릴 코드가 없습니다."}
 

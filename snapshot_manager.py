@@ -17,7 +17,8 @@ DEFAULT_IGNORE = [
     "change_log.json",
     "chat_history.json",
     "meta.json",
-    "snapshot_manager.py"
+    "snapshot_manager.py",
+    "chat.json"
 ]
 
 ARCHIVE_DIRNAME = "archive"
