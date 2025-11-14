@@ -227,8 +227,6 @@ class AnswerTemplateProcessor:
     
     
 
-
-
 # 클라이언트에서 전송되는 오류 데이터 구조
 class ClientError(BaseModel):
     # 필수 필드

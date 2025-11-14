@@ -31,27 +31,34 @@ def create_project_structure(target_path: str):
     try:
         # 2. 대상 경로가 존재하는지 확인하고 없으면 생성
         # exist_ok=True: 이미 경로가 존재해도 오류가 발생하지 않음
-        DEST_DIR.mkdir(parents=True, exist_ok=True)
-        print(f"✅ 대상 디렉토리 준비 완료: {DEST_DIR}")
+        
+        if not os.path.exists(DEST_DIR):
+            DEST_DIR.mkdir(parents=True, exist_ok=True)
+            print(f"✅ 대상 디렉토리 준비 완료: {DEST_DIR}")
 
         # 3. 기본 파일 복사
         for filename in FILES_TO_COPY:
             source_file = SOURCE_DIR / filename
             dest_file = DEST_DIR / filename
             
-            if source_file.exists():
-                # shutil.copy2는 파일 데이터와 메타데이터(수정 시간 등)를 모두 복사합니다.
-                shutil.copy2(source_file, dest_file)
-                print(f"   -> 파일 복사 완료: {filename}")
+            if not dest_file.exists():
+                if source_file.exists():
+                    # shutil.copy2는 파일 데이터와 메타데이터(수정 시간 등)를 모두 복사합니다.
+                    shutil.copy2(source_file, dest_file)
+                    print(f"   -> 파일 복사 완료: {filename}")
+                else:
+                    print(f"⚠️ 경고: 소스 파일이 존재하지 않습니다: {source_file}")
             else:
-                print(f"⚠️ 경고: 소스 파일이 존재하지 않습니다: {source_file}")
+                print(f"대상 파일이 이미 존재합니다.: {dest_file}")
 
         # 4. 'assets' 폴더 생성
         assets_dir = DEST_DIR / "assets"
-        assets_dir.mkdir(exist_ok=True)
-        print(f"   -> 폴더 생성 완료: {assets_dir.name}/")
 
-        print("\n✨ 프로젝트 구조 생성이 성공적으로 완료되었습니다.")
+        if not os.path.exists(assets_dir):
+            assets_dir.mkdir(exist_ok=True)
+            print(f"   -> 폴더 생성 완료: {assets_dir.name}/")
+
+        print("\n✨ index.html, style.css, favicon.png 존재 확인 됨.")
 
     except FileNotFoundError:
         print(f"\n❌ 오류: 소스 디렉토리 ({SOURCE_DIR})를 찾을 수 없습니다. 경로를 확인해주세요.")

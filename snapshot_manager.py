@@ -10,6 +10,8 @@ import fnmatch
 import os
 import sys
 
+from base_dir import BASE_PUBLIC_DIR
+
 DEFAULT_IGNORE = [
     "index.html",
     "style.css",
@@ -609,14 +611,14 @@ def main():
 
 
 
-root = Path(r"C:\Users\UserK\Desktop\final project\snapshot_test") / "test"
+root = BASE_PUBLIC_DIR / "sy_recycle_monsters"
 #root = Path.cwd() / "snapshot_test" / "test"
 #ignore = DEFAULT_IGNORE.copy()
 
 
 
 
-# create_version(root)
+#create_version(root)
 #create_version(root, parent_name="v1-1")
 
 

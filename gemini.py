@@ -11,9 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from realtime import List
 
+from base_dir import BASE_PUBLIC_DIR
 from classes import AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor
 from make_default_game_folder import create_project_structure
-from make_dummy_image_asset_copy_2 import check_and_create_images_with_text
+from make_dummy_image_asset import check_and_create_images_with_text
 from make_dummy_sound_asset import copy_and_rename_sound_files
 from save_chat import load_chat, save_chat
 from snapshot_manager import create_version, find_current_version_from_file, restore_version
@@ -208,15 +209,15 @@ except Exception as e:
 #CODE_PATH_NOCOMMENT = Path(__file__).parent / "playground" / "playground_nocomment.py"
 
 # 1. 게임 이름 정의 (수정 필요 없음)
-GAME_NAME = "test"
+#GAME_NAME = "test"
 
 # 2. 공통 기본 디렉토리 정의
 # 'C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\public'
-BASE_PUBLIC_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\public")
+
 
 # 3. Old Version 디렉토리 정의
 # 'C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion'
-BASE_OLD_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion")
+#BASE_OLD_DIR = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\OldVersion")
 
 # # --- 최종 경로 정의 ---
 
@@ -260,15 +261,15 @@ def ARCHIVE_LOG_PATH(game_name:str):
 
 
 
-# 이전 버전 경로 (BASE_OLD_DIR / GAME_NAME)
-def OLD_GAME_DIR(game_name:str):
-    return BASE_OLD_DIR / game_name
+# # 이전 버전 경로 (BASE_OLD_DIR / GAME_NAME)
+# def OLD_GAME_DIR(game_name:str):
+#     return BASE_OLD_DIR / game_name
 
-def OLD_CODE(game_name:str):
-    return BASE_OLD_DIR / game_name / "(old)game.ts"
+# def OLD_CODE(game_name:str):
+#     return BASE_OLD_DIR / game_name / "(old)game.ts"
 
-def OLD_DATA(game_name:str):
-    return BASE_OLD_DIR / game_name / "(old)data.json"
+# def OLD_DATA(game_name:str):
+#     return BASE_OLD_DIR / game_name / "(old)data.json"
 
 
 
@@ -434,8 +435,8 @@ def modify_code(request, game_name):
     """코드 처리 엔드포인트"""
     #original_code = remove_comments_from_file(CODE_PATH)
 
-    if not os.path.exists(GAME_DIR(game_name)):
-        create_project_structure(GAME_DIR(game_name))
+    #if not os.path.exists(GAME_DIR(game_name)):
+    create_project_structure(GAME_DIR(game_name))
 
     if os.path.exists(CODE_PATH(game_name)):
         with open(CODE_PATH(game_name), 'r', encoding='utf-8') as f:
@@ -561,6 +562,8 @@ async def get_spec(game_name: str):
     if os.path.exists(SPEC_PATH(game_name)):
         with open(SPEC_PATH(game_name), 'r', encoding='utf-8') as f:
             spec = f.read()
+    else:
+        spec = " "
 
     # 최신 사양서(문자열) 반환
     markdown = spec
@@ -573,6 +576,8 @@ async def get_spec(game_name: str):
     if os.path.exists(DATA_PATH(game_name)):
          with open(DATA_PATH(game_name), 'r', encoding='utf-8') as f:
             data = json.load(f) # json.load()는 파일 객체에서 직접 JSON을 읽어 파싱합니다.
+    else:
+        return {}
 
     # 데이터 (문자열) 반환
     return data
@@ -622,11 +627,11 @@ async def process_code(request: CodeRequest):
 
         if success:
             if is_first_created:
-                create_version(GAME_DIR(request.game_name))
+                create_version(GAME_DIR(request.game_name), summary=request.message)
             else:
                 version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
                 current_ver = version_info.get("version")
-                create_version(GAME_DIR(request.game_name), parent_name=current_ver)
+                create_version(GAME_DIR(request.game_name), parent_name=current_ver, summary=request.message)
                 
             save_chat(CHAT_PATH(request.game_name), "bot", description_total)
 
@@ -689,11 +694,12 @@ async def get_snapshot_log(game_name: str):
     SNAPSHOT_LOG_PATH = ARCHIVE_LOG_PATH(game_name)
     # 1. 파일 존재 여부 확인
     if not SNAPSHOT_LOG_PATH.exists():
+        return {"versions":[]}
         # 파일이 없을 경우 404 (Not Found) 오류를 반환
-        raise HTTPException(
-            status_code=404, 
-            detail=f"스냅샷 로그 파일이 존재하지 않습니다: {SNAPSHOT_LOG_PATH}"
-        )
+        # raise HTTPException(
+        #     status_code=404, 
+        #     detail=f"스냅샷 로그 파일이 존재하지 않습니다: {SNAPSHOT_LOG_PATH}"
+        # )
     
     try:
         # 2. JSON 파일 읽기 및 파싱
@@ -993,7 +999,7 @@ async def revert_code(request: RevertRequest):
         restore_success = restore_version(GAME_DIR(game_name), parent_version)
 
         if restore_success:
-            reply = f"코드를 {parent_version} 버전으로 되돌렸습니다."            
+            reply = f"코드를 이전 버전으로 되돌렸습니다."            
             save_chat(CHAT_PATH(request.game_name), "bot", reply)
             return {"status": "success", "reply": reply}
         else:
