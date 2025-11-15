@@ -81,9 +81,9 @@ class MakePromptTemplateProcessor:
                 
         return self._template_cache
 
-    def get_final_prompt(self, user_query) -> str:
+    def get_final_prompt(self, user_query, user_question) -> str:
         template = self._load_template()        
-        prompt = template.format(user_query=user_query)
+        prompt = template.format(user_query=user_query, user_question=user_question)
 
         return prompt
 
@@ -113,15 +113,53 @@ class ModifyPromptTemplateProcessor:
                 
         return self._template_cache
 
-    def get_final_prompt(self, user_query, original_code, original_data) -> str:
+    def get_final_prompt(self, user_query, user_question, original_code, original_data) -> str:
         template = self._load_template()        
-        prompt = template.format(user_query=user_query, original_code=original_code, original_data=original_data)
+        prompt = template.format(user_query=user_query, user_question=user_question, original_code=original_code, original_data=original_data)
 
         return prompt
 
 
 
+
+
+
 class QuestionTemplateProcessor:
+    PROMPT_PATH = Path(__file__).parent / "prompts" / "question.md"
+    
+
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._template_cache: Optional[str] = None # 템플릿 내용을 캐시할 변수
+        self.IS_PROMPT_MODIFICATION_MODE = os.getenv('IS_PROMPT_MODIFICATION_MODE') == "True"
+
+
+
+    def _load_template(self) -> str:
+        with self._lock:
+            if self._template_cache is None or self.IS_PROMPT_MODIFICATION_MODE:
+                if not os.path.exists(self.PROMPT_PATH):
+                    raise FileNotFoundError(f"프롬프트 파일을 찾을 수 없습니다: {self.PROMPT_PATH}")
+
+                with open(self.PROMPT_PATH, "r", encoding="utf-8") as f:
+                    self._template_cache = f.read()
+                
+        return self._template_cache
+
+    def get_final_prompt(self, user_question, original_code, original_data) -> str:
+        template = self._load_template()        
+        prompt = template.format(user_question=user_question, original_code=original_code, original_data=original_data)
+
+        return prompt
+
+
+
+
+
+
+
+class SpecQuestionTemplateProcessor:
     PROMPT_PATH = Path(__file__).parent / "prompts" / "question.md"
     
 
@@ -154,10 +192,8 @@ class QuestionTemplateProcessor:
 
 
 
-
-
-class QuestionTemplateProcessor:
-    PROMPT_PATH = Path(__file__).parent / "prompts" / "question.md"
+class SpecQuestionTemplateProcessor:
+    PROMPT_PATH = Path(__file__).parent / "prompts" / "spec_question.md"
     
 
 
@@ -225,6 +261,44 @@ class AnswerTemplateProcessor:
 
         return prompt
     
+
+
+class PromptDeviderProcessor:
+    PROMPT_PATH = Path(__file__).parent / "prompts" / "devide.md"
+    
+
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._template_cache: Optional[str] = None # 템플릿 내용을 캐시할 변수
+        self.IS_PROMPT_MODIFICATION_MODE = os.getenv('IS_PROMPT_MODIFICATION_MODE') == "True"
+
+
+
+    def _load_template(self) -> str:
+        with self._lock:
+            if self._template_cache is None or self.IS_PROMPT_MODIFICATION_MODE:
+                if not os.path.exists(self.PROMPT_PATH):
+                    raise FileNotFoundError(f"프롬프트 파일을 찾을 수 없습니다: {self.PROMPT_PATH}")
+
+                with open(self.PROMPT_PATH, "r", encoding="utf-8") as f:
+                    self._template_cache = f.read()
+                
+        return self._template_cache
+
+    def get_final_prompt(self, prompt) -> str:
+        template = self._load_template()        
+
+        # qna_str = ""
+        # i = 1
+        # for item in qna:
+        #     qna_str = f"q{i}: {item[0]}\na{i}: {item[1]}\n\n"
+        #     i += 1
+
+        prompt = template.format(user_prompt=prompt)
+
+        return prompt
+        
     
 
 # 클라이언트에서 전송되는 오류 데이터 구조

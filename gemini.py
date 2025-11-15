@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from realtime import List
 
 from base_dir import BASE_PUBLIC_DIR
-from classes import AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor
+from classes import PromptDeviderProcessor, AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor, SpecQuestionTemplateProcessor
 from make_default_game_folder import create_project_structure
 from make_dummy_image_asset import check_and_create_images_with_text
 from make_dummy_sound_asset import copy_and_rename_sound_files
@@ -364,7 +364,7 @@ modifyPTP = ModifyPromptTemplateProcessor()
 # except Exception as e:
 #     print(e)
 
-def parse_ai_response(response_text):
+def parse_ai_code_response(response_text):
     result = {}
     
     # 1. 코드 블록 추출
@@ -398,7 +398,7 @@ def parse_ai_response(response_text):
 
 
 
-def parse_ai_response2(response_text):
+def parse_ai_qna_response(response_text):
     result = {}
     
     # 1. 설명 블록 추출
@@ -410,6 +410,22 @@ def parse_ai_response2(response_text):
     code_start = response_text.find("###SPECIFICATION_START###") + len("###SPECIFICATION_START###")
     code_end = response_text.find("###SPECIFICATION_END###")
     result['specification'] = response_text[code_start:code_end].strip()
+
+    # 필요하다면 여기서 result['game_data']에 대해 json.loads()를 별도로 실행
+    # game_data 블록은 순수한 JSON 텍스트이므로 이스케이프 문제가 훨씬 적습니다.
+    # ...
+
+    return result
+
+
+
+def parse_ai_answer_response(response_text):
+    result = {}
+    
+    # 1. 설명 블록 추출
+    answer_start = response_text.find("###ANSWER_START###") + len("###ANSWER_START###")
+    answer_end = response_text.find("###ANSWER_END###")
+    result['answer'] = response_text[answer_start:answer_end].strip()
 
     # 필요하다면 여기서 result['game_data']에 대해 json.loads()를 별도로 실행
     # game_data 블록은 순수한 JSON 텍스트이므로 이스케이프 문제가 훨씬 적습니다.
@@ -431,7 +447,7 @@ def validate_json(json_str):
     
 
 
-def modify_code(request, game_name):
+def modify_code(request, question, game_name):
     """코드 처리 엔드포인트"""
     #original_code = remove_comments_from_file(CODE_PATH)
 
@@ -453,9 +469,9 @@ def modify_code(request, game_name):
 
 
     if original_code == "":
-        prompt = makePTP.get_final_prompt(request)
+        prompt = makePTP.get_final_prompt(request, question)
     else:
-        prompt = modifyPTP.get_final_prompt(request, original_code, original_data)
+        prompt = modifyPTP.get_final_prompt(request, question, original_code, original_data)
 
     # 💡 config 객체를 생성하여 응답 형식을 JSON으로 지정합니다.
     # config = types.GenerateContentConfig(
@@ -471,7 +487,7 @@ def modify_code(request, game_name):
     )
 
     #responseData = json.loads(remove_code_fences_safe(response.text))
-    responseData = parse_ai_response(response.text)
+    responseData = parse_ai_code_response(response.text)
 
     game_code = remove_code_fences_safe(responseData['game_code'])
     game_data = remove_code_fences_safe(responseData['game_data'])
@@ -512,9 +528,9 @@ def modify_code(request, game_name):
         with open(CODE_PATH(game_name), 'w', encoding='utf-8') as f:  
             f.write(game_code)
 
-        modify_check = "< game.ts : 수정 O >\n"
+        modify_check = "< game.ts : 수정 O >   "
     else:
-        modify_check = "< game.ts : 수정 X >\n"
+        modify_check = "< game.ts : 수정 X >   "
 
             
 
@@ -583,76 +599,202 @@ async def get_spec(game_name: str):
     return data
 
 
+
+
+pdp = PromptDeviderProcessor()
+qtp = QuestionTemplateProcessor()
+
 MAX_ATTEMPTS = 5
 
 @app.post("/process-code")
 async def process_code(request: CodeRequest):
+    game_name = request.game_name
 
-    is_first_created = False
+    prompt = pdp.get_final_prompt(request.message)
 
-    if not os.path.exists(CODE_PATH(request.game_name)):
-        is_first_created = True
+    success = False
+    for i in range(MAX_ATTEMPTS):    
+        try:
+            print(f"프롬프트 분류 중 입니다: {model_name}...")
+            response = gemini_client.models.generate_content(
+                model=model_name,
+                #config = config,
+                contents=prompt
+            )
 
-    """코드 처리 엔드포인트"""
-    try:
-        message = request.message
-        save_chat(CHAT_PATH(request.game_name), "user", message)
-
-        game_code = ""
-        game_data = ""
-        description_total = ""
-
-        success = False
-        fail_message = ""
-        for i in range(MAX_ATTEMPTS):    
-            try:
-                game_code, game_data, description, error = modify_code(message, request.game_name) 
-                description_total = description_total + description
-                
-                if error == "":
-                    # 에러가 빈 문자열이라면 (에러 해결 성공)
-                    print(f"🎉 컴파일 성공! (총 {i + 1}회 시도)")
-                    #final_error = "" # 최종 에러 상태를 성공으로 기록
-                    success = True
-                    break # 반복문을 즉시 중단하고 빠져나옴
-                else:
-                    message = error
-                    # 에러가 있다면 (에러 해결 실패)
-                    print(f"❌ 컴파일 에러 발생: {error}")
-                    #final_error = error # 최종 에러 상태를 실패로 기록
-                    description_total = description_total + "\n\n\n\n\n" + error + "\n\n\n\n\n"
-            except Exception as e:     
+            success = True
+            break
+        except Exception as e:     
                 fail_message = f"❌ 에러 발생: {e}"           
                 print(fail_message)
 
-        if success:
-            if is_first_created:
-                create_version(GAME_DIR(request.game_name), summary=request.message)
-            else:
-                version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(request.game_name))
-                current_ver = version_info.get("version")
-                create_version(GAME_DIR(request.game_name), parent_name=current_ver, summary=request.message)
-                
-            save_chat(CHAT_PATH(request.game_name), "bot", description_total)
+    if not success:
+        save_chat(CHAT_PATH(game_name), "bot", fail_message)
+        return {
+            "status": "fail",
+            "code": "",
+            "data": "",
+            "reply": fail_message
+        }
 
+    devide = json.loads(remove_code_fences_safe(response.text))
+    Modification_Requests = devide["Modification_Requests"]
+    Questions = devide["Questions"]
+    Inappropriate = devide["Inappropriate"]
+  
+    if len(Inappropriate) > 0:
+        formatted_lines = []
+        for item in Inappropriate:
+            # 각 항목을 원하는 형식으로 변환
+            formatted_line = f"죄송합니다 '{item}'는 도와드릴 수 없습니다."
+            formatted_lines.append(formatted_line)
+
+        # 변환된 문자열들을 개행 문자('\n')로 합쳐서 반환
+        Inappropriate_answer = "\n".join(formatted_lines)
+        Inappropriate_answer = "\n\n" + Inappropriate_answer
+    else:
+        Inappropriate_answer = ""
+
+    user_requests = "\n".join(Modification_Requests)
+    user_question = "\n".join(Questions)
+
+    devide_result = f"요청:\n{user_requests}\n질문:\n{user_question}\n부적절:\n{Inappropriate_answer}\n"
+    print(devide_result)
+
+    if len(Modification_Requests) == 0: 
+        save_chat(CHAT_PATH(game_name), "user", request.message)       
+        if len(Questions) == 0:
+            Inappropriate_answer = devide_result + Inappropriate_answer + "\n\n무엇을 도와드릴까요?"
             return {
                 "status": "success",
-                "code": game_code,
-                "data": game_data,
-                "reply": description_total
+                "code": "",
+                "data": "",
+                "reply": Inappropriate_answer
             }
         else:
-            save_chat(CHAT_PATH(request.game_name), "bot", fail_message)
+            if os.path.exists(CODE_PATH(game_name)):
+                with open(CODE_PATH(game_name), 'r', encoding='utf-8') as f:
+                    original_code = f.read()
+            else:
+                original_code = ""
 
+            if os.path.exists(DATA_PATH(game_name)):
+                with open(DATA_PATH(game_name), 'r', encoding='utf-8') as f:
+                    original_data = f.read()
+            else:
+                original_data = ""
+
+            q_prompt = qtp.get_final_prompt(user_question, original_code, original_data)
+
+            answer = ""            
+            success = False
+            for i in range(MAX_ATTEMPTS):    
+                try:
+                    print(f"AI 모델이 작업 중 입니다: {model_name}...")
+                    response = gemini_client.models.generate_content(
+                        model=model_name,
+                        #config = config,
+                        contents=q_prompt
+                    )
+
+                    answer = parse_ai_answer_response(response.text)['answer']
+
+                    success = True
+                    break
+                except Exception as e:     
+                        fail_message = f"❌ 에러 발생: {e}"           
+                        print(fail_message)
+
+            if not success:
+                fail_message = devide_result + fail_message + "\n\n" + Inappropriate_answer
+                save_chat(CHAT_PATH(game_name), "bot", fail_message)
+                return {
+                    "status": "fail",
+                    "code":"",
+                    "data": "",
+                    "reply": fail_message
+                }
+
+            answer = devide_result + answer + "\n\n" + Inappropriate_answer
+            save_chat(CHAT_PATH(game_name), "bot", answer)
             return {
-                "status": "fail",
-                "code": game_code,
-                "data": game_data,
-                "reply": fail_message
+                "status": "success",
+                "code": "",
+                "data": "",
+                "reply": answer
             }
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=str(e))
+    else:
+        is_first_created = False
+
+        if not os.path.exists(CODE_PATH(game_name)):
+            is_first_created = True
+
+        """코드 처리 엔드포인트"""
+        try:
+            message = user_requests
+            q_msg = user_question
+
+            save_chat(CHAT_PATH(game_name), "user", message)
+
+            game_code = ""
+            game_data = ""
+            description_total = ""
+
+            success = False
+            fail_message = ""
+            for i in range(MAX_ATTEMPTS):    
+                try:
+                    game_code, game_data, description, error = modify_code(message, q_msg, game_name) 
+                    description_total = description_total + description
+                    
+                    if error == "":
+                        # 에러가 빈 문자열이라면 (에러 해결 성공)
+                        print(f"🎉 컴파일 성공! (총 {i + 1}회 시도)")
+                        #final_error = "" # 최종 에러 상태를 성공으로 기록
+                        success = True
+                        break # 반복문을 즉시 중단하고 빠져나옴
+                    else:
+                        message = error
+                        # 에러가 있다면 (에러 해결 실패)
+                        print(f"❌ 컴파일 에러 발생: {error}")
+                        #final_error = error # 최종 에러 상태를 실패로 기록
+                        description_total = description_total + "\n\n\n\n\n========Compile Error========\n" + error + "\n=============================\n\n\n\n\n"
+                except Exception as e:     
+                    fail_message = f"❌ 에러 발생: {e}"           
+                    print(fail_message)
+                
+                q_msg = ""
+
+            if success:
+                if game_code != '' or game_data != '':
+                    if is_first_created:
+                        create_version(GAME_DIR(game_name), summary=user_requests)
+                    else:
+                        version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(game_name))
+                        current_ver = version_info.get("version")
+                        create_version(GAME_DIR(game_name), parent_name=current_ver, summary=user_requests)
+                        
+                description_total = devide_result + description_total + "\n\n" + Inappropriate_answer
+                save_chat(CHAT_PATH(game_name), "bot", description_total)
+                return {
+                    "status": "success",
+                    "code": game_code,
+                    "data": game_data,
+                    "reply": description_total
+                }
+            else:                
+                fail_message = devide_result + fail_message + "\n\n" + Inappropriate_answer
+                save_chat(CHAT_PATH(game_name), "bot", fail_message)
+                return {
+                    "status": "fail",
+                    "code": game_code,
+                    "data": game_data,
+                    "reply": fail_message
+                }
+        except Exception as e:            
+            save_chat(CHAT_PATH(game_name), "bot", "서버오류: " + str(e))
+            print(e)
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 # 클라이언트가 전송하는 JSON 본문 구조
@@ -782,9 +924,9 @@ async def log_client_error(error_data: ClientError):
 
 
 
-qtp = QuestionTemplateProcessor()
+sqtp = SpecQuestionTemplateProcessor()
 
-@app.post("/question")
+@app.post("/spec-question")
 async def process_code(request: CodeRequest):
     try:        
         old_spec = ""
@@ -793,7 +935,7 @@ async def process_code(request: CodeRequest):
                 old_spec = f.read()
 
         history = ""#format_chat_history(get_session_history(0))
-        prompt = qtp.get_final_prompt(history, request.message, old_spec)
+        prompt = sqtp.get_final_prompt(history, request.message, old_spec)
 
         print(f"AI 모델이 작업 중 입니다: {model_name}...")
         response = gemini_client.models.generate_content(
@@ -888,7 +1030,7 @@ async def process_chat_data(update: DataUpdatePayload):
         
     version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(game_name))
     current_ver = version_info.get("version")
-    create_version(GAME_DIR(game_name), parent_name=current_ver)
+    create_version(GAME_DIR(game_name), parent_name=current_ver, summary='게임 데이터 수정')
 
     return {
                 "status": "success",
@@ -942,7 +1084,7 @@ async def process_chat_data(data: WrappedSubmitData):   #      game_name: str, d
 
     print(response.text)
 
-    parse = parse_ai_response2(response.text)
+    parse = parse_ai_qna_response(response.text)
     spec = parse['specification']
 
     directory_path = os.path.dirname(SPEC_PATH(game_name)) 
@@ -953,7 +1095,7 @@ async def process_chat_data(data: WrappedSubmitData):   #      game_name: str, d
         f.write(spec)
 
     history = ""#format_chat_history(get_session_history(0))
-    prompt = qtp.get_final_prompt(history, "", spec)
+    prompt = sqtp.get_final_prompt(history, "", spec)
 
     print(f"AI 모델이 작업 중 입니다: {model_name}...")
     response = gemini_client.models.generate_content(

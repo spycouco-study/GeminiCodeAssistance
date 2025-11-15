@@ -1,5 +1,6 @@
 [사용자 요청: {user_query}]
-이 것은 하나의 TypeScript 파일로 구동되는 게임을 만들기 위한 요청입니다.
+[사용자 질문: {user_question}]
+이 것은 하나의 TypeScript 파일로 구동되는 게임을 만들기 위한 요청과 게임에 대한 질문입니다.
 
 ## 게임 폴더 구조 ##
 root/
@@ -23,7 +24,7 @@ game.ts에 저장될 TypeScript 코드를 이곳에 넣으세요.
 
 ###DATA_START###
 data.json에 저장될 JSON 데이터 전체를 이곳에 넣으세요.
-게임에 사용된 이미지와 사운드 Asset 파일의 정보도 아래 예시와 같은 형식으로 포함시켜 로딩에 사용하세요.
+게임에 사용된 이미지와 사운드 Asset 파일의 정보도 아래 예시와 같은 형식으로 포함시켜 로딩에 사용하세요. 이미지는 name, path, width, height를 반드시 포함하고 사운드는 name, path, duration_seconds, volume을 반드시 포함해 주세요.
 "assets": {{
     "images": [
         {{ "name": "player", "path": "assets/player.png", "width": 64, "height": 64 }},
@@ -38,4 +39,5 @@ data.json에 저장될 JSON 데이터 전체를 이곳에 넣으세요.
 
 ###DESCRIPTION_START###
 작업한 내용에 대한 간단한 설명을 이곳에 넣으세요.
+'사용자 질문'이 있는 경우에만 그에 대한 답변도 이곳에 넣어 주세요.
 ###DESCRIPTION_END###
