@@ -1,13 +1,16 @@
 import json
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
 import os
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from realtime import List
@@ -21,6 +24,10 @@ from save_chat import load_chat, save_chat
 from snapshot_manager import create_version, find_current_version_from_file, restore_version
 from tools.debug_print import debug_print
 from tsc import check_typescript_compile_error
+
+from PIL import Image 
+
+import ffmpeg
 #from supabase import format_chat_history, get_session_history
 
 # FastAPI 앱 인스턴스 생성
@@ -1300,6 +1307,124 @@ async def serve_selective_static_file(game_name: str, file_path: str):
     else:
         raise HTTPException(status_code=404, detail="File Not Found.")
 
+
+
+
+
+
+
+
+
+
+
+
+
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
+
+def _is_safe_filename(name: str) -> bool:
+    return name == os.path.basename(name) and not any(x in name for x in ["/", "\\"])
+
+def _ensure_under_root(path: Path):
+    try:
+        if not path.resolve().is_relative_to(GAMES_ROOT_DIR):
+            raise HTTPException(status_code=403, detail="Invalid path traversal")
+    except Exception:
+        raise HTTPException(status_code=403, detail="Invalid path traversal")
+
+@app.post("/replace-asset")
+async def replace_asset(
+    game_name: str = Form(...),
+    old_name: str = Form(...),
+    type: str = Form(...),  # 'image' | 'sound'
+    file: UploadFile = File(...),
+):
+    if not game_name.strip():
+        raise HTTPException(status_code=400, detail="game_name is required")
+    if type not in ("image", "sound"):
+        raise HTTPException(status_code=400, detail="type must be 'image' or 'sound'")
+    if not _is_safe_filename(old_name):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    assets_dir = (GAMES_ROOT_DIR / game_name / "assets")
+    _ensure_under_root(assets_dir)
+    assets_dir.mkdir(parents=True, exist_ok=True)
+
+    old_path = (assets_dir / old_name)
+    _ensure_under_root(old_path)
+
+    base = Path(old_name).stem
+    # 표준 확장자 강제
+    new_name = f"{base}.png" if type == "image" else f"{base}.mp3"
+    dst_path = (assets_dir / new_name)
+    _ensure_under_root(dst_path)
+
+    # 업로드를 임시 파일에 저장
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = Path(tmp.name)
+
+    try:
+        ext = Path(file.filename).suffix.lower()
+
+        if type == "image":
+            if ext == ".png":
+                # 이미 PNG면 그대로 복사
+                shutil.copyfile(tmp_path, dst_path)
+            else:
+                with Image.open(tmp_path) as img:
+                    if img.mode in ("RGBA", "LA", "P"):
+                        img = img.convert("RGBA")
+                    else:
+                        img = img.convert("RGB")
+                    img.save(dst_path, format="PNG", optimize=True)
+        else:  # sound
+            if ext == ".mp3":
+                shutil.copyfile(tmp_path, dst_path)
+            else:
+                # audio = AudioSegment.from_file(tmp_path)
+                # audio.export(dst_path, format="mp3", bitrate="192k")
+                
+                # ffmpeg를 사용해 mp3로 변환
+                cmd = [
+                    "ffmpeg",
+                    "-y",
+                    "-i", str(tmp_path),
+                    "-b:a", "192k",
+                    str(dst_path)
+                ]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # 이전 파일명이 다르면(확장자 변경) 기존 파일 제거
+        try:
+            if old_path.exists() and old_path.resolve() != dst_path.resolve():
+                old_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        
+        version_info = find_current_version_from_file(ARCHIVE_LOG_PATH(game_name))
+        current_ver = version_info.get("version")
+        create_version(GAME_DIR(game_name), parent_name=current_ver, summary=f'{new_name}파일을 다른 파일로 교체 했습니다.')
+
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Convert/Save failed: {e}")
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+                 
+    url = f"/static/{game_name}/assets/{new_name}"
+    return JSONResponse({
+        "status": "success",
+        "replaced": old_name,
+        "name": new_name,
+        "url": url,
+        "message": "Asset converted and replaced",
+    })
 
 
 
