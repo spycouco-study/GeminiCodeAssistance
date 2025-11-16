@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 import re
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
 import os
@@ -255,6 +256,9 @@ def SPEC_PATH(game_name:str):
 
 def CHAT_PATH(game_name:str):
     return BASE_PUBLIC_DIR / game_name / "chat.json"
+
+def ASSETS_PATH(game_name:str):
+    return BASE_PUBLIC_DIR / game_name / "assets"
 
 def ARCHIVE_LOG_PATH(game_name:str):
      return BASE_PUBLIC_DIR / game_name / "archive" / "change_log.json"
@@ -1168,6 +1172,146 @@ async def revert_code(request: RevertRequest):
         #     #raise HTTPException(status_code=404, detail="되돌릴 코드가 없습니다.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+
+# # 정적 파일 마운트: ./assets 폴더를 /static으로 서빙
+# # 구조 예: assets/<game_name>/images/*.png, assets/<game_name>/sounds/*.mp3
+# app.mount("/static", StaticFiles(directory=ASSETS_PATH('sy_vampire_survivors')), name="static")
+# #app.mount("/static", StaticFiles(directory="assets"), name="static")
+
+# class AssetItem(BaseModel):
+#     name: str
+#     url: str
+
+# class AssetsResponse(BaseModel):
+#     images: List[AssetItem]
+#     sounds: List[AssetItem]
+
+# @app.get("/assets", response_model=AssetsResponse)
+# def get_assets(game_name: str = Query(..., alias="game_name")):
+#     # base = os.path.join("assets", game_name)
+#     # images_dir = os.path.join(base, "images")
+#     # sounds_dir = os.path.join(base, "sounds")
+
+#     images_dir = ASSETS_PATH(game_name)
+#     sounds_dir = ASSETS_PATH(game_name)
+
+#     images: List[AssetItem] = []
+#     sounds: List[AssetItem] = []
+
+#     if os.path.isdir(images_dir):
+#         for fn in os.listdir(images_dir):
+#             if fn.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")):
+#                 images.append(AssetItem(name=fn, url=f"/static/{fn}"))
+#                 #images.append(AssetItem(name=fn, url=f"/static/{game_name}/images/{fn}"))
+
+#     if os.path.isdir(sounds_dir):
+#         for fn in os.listdir(sounds_dir):
+#             if fn.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac")):
+#                 sounds.append(AssetItem(name=fn, url=f"/static/{fn}"))
+#                 #sounds.append(AssetItem(name=fn, url=f"/static/{game_name}/sounds/{fn}"))
+
+#     return AssetsResponse(images=images, sounds=sounds)
+
+
+
+
+
+
+
+
+
+
+# 💡 모든 게임 폴더를 담고 있는 상위 루트 폴더를 지정합니다.
+GAMES_ROOT_DIR = BASE_PUBLIC_DIR.resolve() 
+
+# Pydantic 모델 (AssetItem의 URL 구조만 변경됩니다)
+class AssetItem(BaseModel):
+    name: str
+    url: str
+
+class AssetsResponse(BaseModel):
+    images: List[AssetItem]
+    sounds: List[AssetItem]
+
+# --------------------------------------------------------------------------------
+# 1. 파일 목록을 제공하는 API 라우터
+# --------------------------------------------------------------------------------
+@app.get("/assets", response_model=AssetsResponse)
+def get_assets(game_name: str = Query(..., alias="game_name")):
+    
+    # 1. assets 폴더 경로 (images/sounds 하위 폴더 없음)
+    assets_dir = GAMES_ROOT_DIR / game_name / "assets"
+
+    images: List[AssetItem] = []
+    sounds: List[AssetItem] = []
+
+    if assets_dir.is_dir():
+        # URL의 기본 경로: /static/game_name/assets/
+        relative_url_base = f"/static/{game_name}/assets/" 
+        
+        for fn in os.listdir(assets_dir):
+            file_path = assets_dir / fn
+            if file_path.is_file():
+                
+                # 2. 파일 확장자를 확인하여 이미지와 사운드를 분류
+                if fn.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")):
+                    images.append(AssetItem(name=fn, url=f"{relative_url_base}{fn}"))
+                
+                elif fn.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac")):
+                    sounds.append(AssetItem(name=fn, url=f"{relative_url_base}{fn}"))
+
+    return AssetsResponse(images=images, sounds=sounds)
+
+
+# --------------------------------------------------------------------------------
+# 2. 파일 콘텐츠를 서빙하는 커스텀 라우터 (보안 필터링 역할)
+# --------------------------------------------------------------------------------
+@app.get("/static/{game_name}/{file_path:path}")
+async def serve_selective_static_file(game_name: str, file_path: str):
+    
+    # 1. assets 폴더 필터링 (가장 중요한 보안 로직)
+    # 요청 경로가 'assets/'로 시작하는지 확인합니다.
+    if not file_path.startswith("assets/"):
+        # assets 폴더 밖의 파일(예: game.ts, data.json) 요청은 차단
+        raise HTTPException(status_code=403, detail="Access denied. Only files within the 'assets' subdirectory are accessible.")
+
+    # 2. 파일의 실제 경로 구성
+    # 예: GAMES_ROOT_DIR / game_a / assets / image.png
+    full_path = GAMES_ROOT_DIR / game_name / file_path
+    
+    # 3. 경로 조작 공격 방지 (보안 강화)
+    try:
+        resolved_path = full_path.resolve()
+        
+        if not resolved_path.is_relative_to(GAMES_ROOT_DIR):
+             raise HTTPException(status_code=403, detail="Invalid path traversal attempt.")
+
+    except Exception:
+        raise HTTPException(status_code=404, detail="File Not Found.")
+
+    # 4. 파일 존재 여부 최종 확인 및 응답
+    if resolved_path.is_file():
+        return FileResponse(resolved_path)
+    else:
+        raise HTTPException(status_code=404, detail="File Not Found.")
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # 서버 실행 방법 1: uvicorn 명령어로 직접 실행 (권장)
 # uvicorn gemini:app --reload --port 8000
