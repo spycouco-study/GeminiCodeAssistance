@@ -621,53 +621,64 @@ MAX_ATTEMPTS = 5
 async def process_code(request: CodeRequest):
     game_name = request.game_name
 
-    prompt = pdp.get_final_prompt(request.message)
 
-    success = False
-    for i in range(MAX_ATTEMPTS):    
-        try:
-            print(f"프롬프트 분류 중 입니다: {model_name}...")
-            response = gemini_client.models.generate_content(
-                model=model_name,
-                #config = config,
-                contents=prompt
-            )
 
-            success = True
-            break
-        except Exception as e:     
-                fail_message = f"❌ 에러 발생: {e}"           
-                print(fail_message)
+    # prompt = pdp.get_final_prompt(request.message)
 
-    if not success:
-        save_chat(CHAT_PATH(game_name), "bot", fail_message)
-        return {
-            "status": "fail",
-            "code": "",
-            "data": "",
-            "reply": fail_message
-        }
+    # success = False
+    # for i in range(MAX_ATTEMPTS):    
+    #     try:
+    #         print(f"프롬프트 분류 중 입니다: {model_name}...")
+    #         response = gemini_client.models.generate_content(
+    #             model=model_name,
+    #             #config = config,
+    #             contents=prompt
+    #         )
 
-    devide = json.loads(remove_code_fences_safe(response.text))
-    Modification_Requests = devide["Modification_Requests"]
-    Questions = devide["Questions"]
-    Inappropriate = devide["Inappropriate"]
+    #         success = True
+    #         break
+    #     except Exception as e:     
+    #             fail_message = f"❌ 에러 발생: {e}"           
+    #             print(fail_message)
+
+    # if not success:
+    #     save_chat(CHAT_PATH(game_name), "bot", fail_message)
+    #     return {
+    #         "status": "fail",
+    #         "code": "",
+    #         "data": "",
+    #         "reply": fail_message
+    #     }
+
+    # devide = json.loads(remove_code_fences_safe(response.text))
+    # Modification_Requests = devide["Modification_Requests"]
+    # Questions = devide["Questions"]
+    # Inappropriate = devide["Inappropriate"]
   
-    if len(Inappropriate) > 0:
-        formatted_lines = []
-        for item in Inappropriate:
-            # 각 항목을 원하는 형식으로 변환
-            formatted_line = f"죄송합니다 '{item}'는 도와드릴 수 없습니다."
-            formatted_lines.append(formatted_line)
+    # if len(Inappropriate) > 0:
+    #     formatted_lines = []
+    #     for item in Inappropriate:
+    #         # 각 항목을 원하는 형식으로 변환
+    #         formatted_line = f"죄송합니다 '{item}'는 도와드릴 수 없습니다."
+    #         formatted_lines.append(formatted_line)
 
-        # 변환된 문자열들을 개행 문자('\n')로 합쳐서 반환
-        Inappropriate_answer = "\n".join(formatted_lines)
-        Inappropriate_answer = "\n\n" + Inappropriate_answer
-    else:
-        Inappropriate_answer = ""
+    #     # 변환된 문자열들을 개행 문자('\n')로 합쳐서 반환
+    #     Inappropriate_answer = "\n".join(formatted_lines)
+    #     Inappropriate_answer = "\n\n" + Inappropriate_answer
+    # else:
+    #     Inappropriate_answer = ""
 
-    user_requests = "\n".join(Modification_Requests)
-    user_question = "\n".join(Questions)
+    # user_requests = "\n".join(Modification_Requests)
+    # user_question = "\n".join(Questions)
+
+
+    Modification_Requests = [""]
+    Questions = [""]
+    user_requests = request.message
+    user_question = ""
+    Inappropriate_answer = ""
+
+
 
     devide_result = f"요청:\n{user_requests}\n질문:\n{user_question}\n부적절:\n{Inappropriate_answer}\n"
     print(devide_result)

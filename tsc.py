@@ -6,6 +6,8 @@ import json
 import sys
 from typing import Dict, Any, List
 
+from base_dir import BASE_DIR, BASE_PUBLIC_DIR
+
 def check_typescript_errors_with_options(config_path: str, ts_file_path: str) -> Dict[str, Any]:
     # 1. tsconfig.json 파일에서 컴파일러 옵션 로드 (이 부분은 동일)
     try:
@@ -49,6 +51,9 @@ def check_typescript_errors_with_options(config_path: str, ts_file_path: str) ->
     # 3. 마지막에 검사할 파일 경로 추가 (이 부분은 동일)
     command_args.append(ts_file_path)
 
+    # tsconfig.json 파일이 있는 디렉터리 경로를 추출합니다.
+    config_dir = os.path.dirname(config_path)
+
     # 4. 명령어 실행 (shell=True가 포함되어 있다고 가정)
     try:
         # shell=True를 반드시 포함해야 npx 실행 오류가 발생하지 않습니다.
@@ -57,7 +62,8 @@ def check_typescript_errors_with_options(config_path: str, ts_file_path: str) ->
             capture_output=True,
             text=True,
             check=False,
-            shell=True 
+            shell=True,
+            cwd=config_dir
         )
         
         return {
@@ -135,7 +141,7 @@ def format_error_message_simplified(error_text: str, filename: str) -> str:
 FILE_NAME = "love game.ts"
 CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\src" + "\\" + FILE_NAME)
 CONFIG_FILE_NAME = "tsconfig.json"
-CONFIG_CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder" + "\\" + CONFIG_FILE_NAME)
+CONFIG_CODE_PATH = BASE_DIR / CONFIG_FILE_NAME
 
 
 def check_typescript_compile_error(file_path:Path):
@@ -171,3 +177,8 @@ def check_typescript_compile_error(file_path:Path):
         # 정상적인 경우 출력은 보통 비어있습니다.
         # print(analysis_result['stdout'])
         return ""
+    
+
+
+
+#check_typescript_compile_error(BASE_PUBLIC_DIR / "sy_ppt" / "game.ts")
