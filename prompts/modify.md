@@ -30,7 +30,7 @@ game.ts에 저장될 TypeScript 코드를 이곳에 넣으세요. 만약 변경�
 
 ###DATA_START###
 data.json에 저장될 JSON 데이터 전체를 이곳에 넣으세요. 만약 변경된 내용이 없다면 비워두세요.
-게임에 사용된 이미지와 사운드 Asset 파일의 정보도 아래 예시와 같은 형식으로 포함시켜 로딩에 사용하세요. 이미지는 png형식이어야 하고 name, path, width, height를 반드시 포함해야 합니다. 사운드는 mp3형식이어야 하고 name, path, duration_seconds, volume을 반드시 포함해야 합니다.
+게임에 사용된 이미지와 사운드 Asset 파일의 정보도 아래 예시와 같은 형식으로 포함시켜 로딩에 사용하세요. "assets"는 최상위 레벨에 있어야 합니다. 이미지는 png형식이어야 하고 name, path, width, height를 반드시 포함해야 합니다. 사운드는 mp3형식이어야 하고 name, path, duration_seconds, volume을 반드시 포함해야 합니다.
 "assets": {{
     "images": [
         {{ "name": "player", "path": "assets/player.png", "width": 64, "height": 64 }},
