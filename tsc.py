@@ -8,62 +8,147 @@ from typing import Dict, Any, List
 
 from base_dir import BASE_DIR, BASE_PUBLIC_DIR
 
-def check_typescript_errors_with_options(config_path: str, ts_file_path: str) -> Dict[str, Any]:
-    # 1. tsconfig.json 파일에서 컴파일러 옵션 로드 (이 부분은 동일)
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config_data = json.load(f)
-            options = config_data.get('compilerOptions', {})
-    # ... (생략: FileNotFoundError 및 JSONDecodeError 처리)
-    except Exception as e:
-        return {
-            'success': False,
-            'return_code': -1,
-            'stdout': '',
-            'stderr': f"Error: tsconfig file handling error: {e}"
-        }
 
-    # 2. tsc 명령 인자 리스트 생성
-    command_args: List[str] = ['npx', 'tsc', '--noEmit']
+
+
+
+# def check_typescript_file(config_path: Path, game_name: str) -> Dict[str, Any]:
+#     """
+#     루트에서 특정 게임의 game.ts만 타입 체크
+#     """
+#     project_root = os.path.dirname(config_path)
+#     ts_file = f"public/{game_name}/game.ts"
     
-    # 🌟 [수정된 부분]: lib 옵션 처리
-    lib_value = options.get('lib')
-    if lib_value:
-        if isinstance(lib_value, list):
-            # 배열인 경우, 콤마로 연결하여 하나의 인수로 전달합니다.
-            command_args.extend(['--lib', ','.join(lib_value)])
-        else:
-            # 배열이 아닌 경우 (예: 문자열) 그대로 전달합니다.
-            command_args.extend(['--lib', str(lib_value)])
+#     # 디버깅 정보 출력
+#     print(f"🔍 Debug Info:")
+#     print(f"  config_path: {config_path}")
+#     print(f"  project_root: {project_root}")
+#     print(f"  ts_file: {ts_file}")
+#     print(f"  cwd: {project_root}")
+#     print(f"  tsconfig.json exists: {os.path.exists(os.path.join(project_root, 'tsconfig.json'))}")
+    
+#     result = subprocess.run(
+#         ['npx', 'tsc', '--noEmit', ts_file],
+#         capture_output=True,
+#         text=True,
+#         check=False,
+#         shell=True,
+#         cwd=project_root
+#     )
+    
+#     return {
+#         'success': result.returncode == 0,
+#         'return_code': result.returncode,
+#         'stdout': result.stdout,
+#         'stderr': result.stderr
+#     }
+
+
+# #config_path = Path(r"c:\Users\spyco\Desktop\final_project\game3d_4\tsconfig.json")
+# config_path = BASE_DIR / "tsconfig.json"
+# result = check_typescript_file(config_path, "sample-3d-game")
+
+# print(f"\n{'='*60}")
+# print(f"✅ Success: {result['success']}")
+# print(f"📊 Return Code: {result['return_code']}")
+
+# if result['stdout']:
+#     print(f"\n📝 STDOUT:\n{result['stdout']}")
+
+# if result['stderr']:
+#     print(f"\n❌ STDERR:\n{result['stderr']}")
+
+
+
+
+def check_typescript_errors_with_options(config_path: str, ts_file_path: str) -> Dict[str, Any]:
+    # # # 1. tsconfig.json 파일에서 컴파일러 옵션 로드 (이 부분은 동일)
+    # try:
+    #     with open(config_path, 'r', encoding='utf-8') as f:
+    #         config_data = json.load(f)
+    #         options = config_data.get('compilerOptions', {})
+    # # ... (생략: FileNotFoundError 및 JSONDecodeError 처리)
+    # except Exception as e:
+    #     return {
+    #         'success': False,
+    #         'return_code': -1,
+    #         'stdout': '',
+    #         'stderr': f"Error: tsconfig file handling error: {e}"
+    #     }
+
+    # # 2. tsc 명령 인자 리스트 생성
+    # command_args: List[str] = ['npx', 'tsc', '--noEmit']
+    # #command_args: List[str] = ['npx', 'tsc']
+        
+    # # ✨✨✨ 핵심 수정 부분: 오류가 있어도 JS 파일 생성을 강제합니다.
+    # # tsconfig.json의 noEmitOnError 설정을 덮어씁니다.
+    # #command_args.extend(['--noEmitOnError', 'false'])
+    
+
+
+
+    # # 🌟 [수정된 부분]: lib 옵션 처리
+    # lib_value = options.get('lib')
+    # if lib_value:
+    #     if isinstance(lib_value, list):
+    #         # 배열인 경우, 콤마로 연결하여 하나의 인수로 전달합니다.
+    #         command_args.extend(['--lib', ','.join(lib_value)])
+    #     else:
+    #         # 배열이 아닌 경우 (예: 문자열) 그대로 전달합니다.
+    #         command_args.extend(['--lib', str(lib_value)])
             
-    # [이전과 동일]: target, module 등의 문자열 값 옵션
-    for key in ['target', 'module']: # lib는 위에서 처리했으므로 제외
-        value = options.get(key)
-        if value:
-            command_args.extend([f'--{key}', str(value)])
+    # # [이전과 동일]: target, module 등의 문자열 값 옵션
+    # for key in ['target', 'module']: # lib는 위에서 처리했으므로 제외
+    #     value = options.get(key)
+    #     if value:
+    #         command_args.extend([f'--{key}', str(value)])
             
-    # [이전과 동일]: strict, esModuleInterop 등의 부울 값 옵션
-    for key in ['strict', 'esModuleInterop', 'skipLibCheck']:
-        value = options.get(key)
-        if value is True:
-            command_args.append(f'--{key}')
+    # # [이전과 동일]: strict, esModuleInterop 등의 부울 값 옵션
+    # for key in ['strict', 'esModuleInterop', 'skipLibCheck']:
+    #     value = options.get(key)
+    #     if value is True:
+    #         command_args.append(f'--{key}')
             
-    # 3. 마지막에 검사할 파일 경로 추가 (이 부분은 동일)
-    command_args.append(ts_file_path)
+
+
+
+    # # 3. 마지막에 검사할 파일 경로 추가 (이 부분은 동일)
+    # command_args.append(ts_file_path)
 
     # tsconfig.json 파일이 있는 디렉터리 경로를 추출합니다.
-    config_dir = os.path.dirname(config_path)
+    #config_dir = os.path.dirname(config_path)
+
+    config_dir = os.path.dirname(ts_file_path)
+
+
+
+    
+
+
+
+
+
 
     # 4. 명령어 실행 (shell=True가 포함되어 있다고 가정)
     try:
-        # shell=True를 반드시 포함해야 npx 실행 오류가 발생하지 않습니다.
+        # #shell=True를 반드시 포함해야 npx 실행 오류가 발생하지 않습니다.
+        # result = subprocess.run(
+        #     command_args,
+        #     capture_output=True,
+        #     text=True,
+        #     check=False,
+        #     shell=True,
+        #     cwd=config_dir
+        # )
+
+        project_file_name = 'tsconfig.json' 
+
         result = subprocess.run(
-            command_args,
+            ['npx', 'tsc', '--noEmit', '--project', project_file_name], 
+            cwd=config_dir,
             capture_output=True,
             text=True,
-            check=False,
-            shell=True,
-            cwd=config_dir
+            shell=True 
         )
         
         return {
@@ -81,6 +166,52 @@ def check_typescript_errors_with_options(config_path: str, ts_file_path: str) ->
             'stdout': '',
             'stderr': f"An unexpected error occurred during execution: {e}"
         }
+
+
+def check_typescript_errors(ts_file_path):
+    """
+    tsc로 TypeScript 파일의 타입 오류 체크
+    
+    Args:
+        ts_file_path: TypeScript 파일 경로
+        
+    Returns:
+        dict: {'success': bool, 'errors': str}
+    """
+    try:
+        # 절대 경로로 변환
+        ts_file_path = os.path.abspath(ts_file_path)
+        file_name = os.path.basename(ts_file_path)
+        work_dir = os.path.dirname(os.path.dirname(os.path.dirname(ts_file_path)))
+        
+        # # tsc로 타입 체크 (빌드 없이 검증만)
+        # result = subprocess.run(
+        #     ['npx', 'tsc', file_name, '--noEmit', '--skipLibCheck', 
+        #      '--target', 'ES2020', '--module', 'ES2020', 
+        #      '--lib', 'ES2020,DOM', '--moduleResolution', 'bundler'],
+        #     cwd=work_dir,
+        #     capture_output=True,
+        #     text=True,
+        #     shell=True  # Windows에서 npx 실행을 위해 필요
+        # )
+
+        # tsc로 타입 체크 (빌드 없이 검증만)
+        result = subprocess.run(
+            ['npx', 'tsc', file_name, '--noEmit'],
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+            shell=True  # Windows에서 npx 실행을 위해 필요
+        )
+        
+        if result.returncode == 0:
+            return {'success': True, 'errors': None}
+        else:
+            return {'success': False, 'errors': result.stdout + result.stderr}
+            
+    except Exception as e:
+        return {'success': False, 'errors': str(e)}
+
 
 
 # 정규 표현식 패턴:
@@ -137,9 +268,69 @@ def format_error_message_simplified(error_text: str, filename: str) -> str:
 
 
 
-# --- 사용 예시 ---
-FILE_NAME = "love game.ts"
-CODE_PATH = Path(r"C:\Users\UserK\Desktop\final project\ts_game\GameMakeTest\GameFolder\src" + "\\" + FILE_NAME)
+def build_with_esbuild(ts_file_path, output_path=None, format='esm', target='es2020', sourcemap='inline'):
+    """
+    esbuild로 TypeScript 파일 빌드
+    
+    Args:
+        ts_file_path: TypeScript 파일 경로
+        output_path: 출력 파일 경로 (None이면 .ts를 .js로 변경)
+        format: 출력 포맷 ('esm', 'cjs', 'iife')
+        target: 타겟 버전 ('es2020', 'es2015' 등)
+        sourcemap: 소스맵 옵션 ('inline', 'external', None)
+        
+    Returns:
+        dict: {'success': bool, 'output': str, 'error': str}
+    """
+    try:
+        # 절대 경로로 변환
+        ts_file_path = os.path.abspath(ts_file_path)
+        file_name = os.path.basename(ts_file_path)
+        work_dir = os.path.dirname(ts_file_path)
+        
+        # 출력 경로 설정
+        if output_path is None:
+            output_path = ts_file_path.replace('.ts', '.js')
+        
+        # esbuild 명령어 구성
+        cmd = [
+            'npx', 'esbuild', file_name,
+            f'--outfile={os.path.basename(output_path)}',
+            f'--format={format}',
+            f'--target={target}'
+        ]
+        
+        if sourcemap:
+            cmd.append(f'--sourcemap={sourcemap}')
+        
+        # esbuild 실행
+        result = subprocess.run(
+            cmd,
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+            shell=True  # Windows에서 npx 실행을 위해 필요
+        )
+        
+        if result.returncode == 0:
+            return {
+                'success': True,
+                'output': output_path,
+                'message': result.stdout + result.stderr
+            }
+        else:
+            return {
+                'success': False,
+                'output': None,
+                'error': result.stdout + result.stderr
+            }
+            
+    except Exception as e:
+        return {'success': False, 'output': None, 'error': str(e)}
+
+
+
+
 CONFIG_FILE_NAME = "tsconfig.json"
 CONFIG_CODE_PATH = BASE_DIR / CONFIG_FILE_NAME
 
@@ -147,7 +338,9 @@ CONFIG_CODE_PATH = BASE_DIR / CONFIG_FILE_NAME
 def check_typescript_compile_error(file_path:Path):
     print(f"📄 {file_path.name} 파일을 {CONFIG_FILE_NAME} 설정으로 검사 시작...")
 
+    #analysis_result = check_typescript_errors(file_path)
     analysis_result = check_typescript_errors_with_options(CONFIG_CODE_PATH, file_path)
+    build_with_esbuild(file_path)
 
     print("\n--- 검사 결과 ---")
     if not analysis_result['success']:
@@ -181,4 +374,20 @@ def check_typescript_compile_error(file_path:Path):
 
 
 
-#check_typescript_compile_error(BASE_PUBLIC_DIR / "sy_ppt" / "game.ts")
+
+
+
+# entries = os.listdir(BASE_PUBLIC_DIR)
+#     # 2. 각 항목이 실제로 디렉터리(폴더)인지 확인합니다.
+# for entry in entries:
+#     # 항목의 전체 경로를 만듭니다.
+#     full_path = os.path.join(BASE_PUBLIC_DIR, entry)
+    
+#     # 전체 경로가 디렉터리인지 확인합니다.
+#     if os.path.isdir(full_path):
+#         check_typescript_compile_error(Path(full_path) / "game.ts")
+
+
+
+#check_typescript_compile_error(Path(BASE_PUBLIC_DIR) / "sy_vampire_survivors" / "game.ts")
+#check_typescript_compile_error(Path(BASE_PUBLIC_DIR) / "sy_3d_dddd2" / "game.ts")

@@ -61,6 +61,7 @@ load_dotenv()
 # Gemini API 초기화
 gemini_api_key = os.getenv('GEMINI_API_KEY')
 model_name = "gemini-2.5-flash"
+#model_name = "gemini-3-pro-preview"
 
 # 요청 모델 정의
 class CodeRequest(BaseModel):
@@ -931,13 +932,25 @@ async def log_client_error(error_data: ClientError):
     클라이언트로부터 전송된 오류 로그를 받아 처리합니다.
     """
     # 🌟 1. 로그 기록 (가장 중요)
-    print(f"[{error_data.time}] 💥 CLIENT ERROR ({error_data.type})")
+    print(f"[{error_data.time}] 💥 CLIENT RUNTIME ERROR 발생! ({error_data.type})")
     print(f"  Version: {error_data.game_version}")
     print(f"  Message: {error_data.message}")
     
-    if error_data.stack:
-        print(f"  Stack Trace:\n{error_data.stack[:200]}...") # 스택은 너무 길 수 있으므로 일부만 출력
+    # if error_data.stack:
+    #     print(f"  Stack Trace:\n{error_data.stack[:200]}...") # 스택은 너무 길 수 있으므로 일부만 출력
     
+    if error_data.stack:
+        stack_lines = error_data.stack.split('\n')
+        # 최대 10줄만 출력
+        output_lines = stack_lines[:5] 
+        
+        # 만약 10줄이 넘는다면 '...' 추가
+        if len(stack_lines) > 5:
+            output_lines.append("... (Full stack trace truncated)")
+
+        print(f"  Stack Trace:\n{'\n'.join(output_lines)}")
+
+
     # 🌟 2. 실제 데이터베이스나 파일에 저장
     # 예: log_to_database(error_data)
     # 예: log_to_file(error_data)

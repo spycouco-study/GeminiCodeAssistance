@@ -26,7 +26,7 @@ def create_project_structure(target_path: str):
     DEST_DIR = Path(target_path)
     
     # 복사할 파일 목록
-    FILES_TO_COPY = ["index.html", "style.css", "favicon.png"]
+    FILES_TO_COPY = ["index.html", "style.css", "favicon.png", "tsconfig.json"]
     
     try:
         # 2. 대상 경로가 존재하는지 확인하고 없으면 생성
@@ -58,7 +58,7 @@ def create_project_structure(target_path: str):
             assets_dir.mkdir(exist_ok=True)
             print(f"   -> 폴더 생성 완료: {assets_dir.name}/")
 
-        print("\n✨ index.html, style.css, favicon.png 존재 확인 됨.")
+        print("\n✨ index.html, style.css, favicon.png, tsconfig.json 존재 확인 됨.")
 
     except FileNotFoundError:
         print(f"\n❌ 오류: 소스 디렉토리 ({SOURCE_DIR})를 찾을 수 없습니다. 경로를 확인해주세요.")

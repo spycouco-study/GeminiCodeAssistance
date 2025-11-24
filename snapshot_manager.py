@@ -611,7 +611,7 @@ def main():
 
 
 
-root = BASE_PUBLIC_DIR / "sy_recycle_monsters"
+root = BASE_PUBLIC_DIR / "sy_3d_dddd2"
 #root = Path.cwd() / "snapshot_test" / "test"
 #ignore = DEFAULT_IGNORE.copy()
 
@@ -619,16 +619,37 @@ root = BASE_PUBLIC_DIR / "sy_recycle_monsters"
 
 
 #create_version(root)
-#create_version(root, parent_name="v1-1")
+#create_version(root, parent_name="v2-1")
 
 
 
 
-#restore_version(root, "v2-1")
+#restore_version(root, "v3-1")
 
 
 
 
 
 
-#find_current_version_from_file(r"C:\Users\UserK\Desktop\final project\snapshot_test\test\archive\change_log.json")
+# version_info = find_current_version_from_file(root / "archive" / "change_log.json")
+# current_ver = version_info.get("version")
+# create_version(root, parent_name=current_ver)
+
+
+
+# entries = os.listdir(BASE_PUBLIC_DIR)
+# # 2. 각 항목이 실제로 디렉터리(폴더)인지 확인합니다.
+# for entry in entries:
+#     # 항목의 전체 경로를 만듭니다.
+#     full_path = os.path.join(BASE_PUBLIC_DIR, entry)
+    
+#     # 전체 경로가 디렉터리인지 확인합니다.
+#     if os.path.isdir(full_path):
+#         full_path = Path(full_path)
+#         version_info = find_current_version_from_file(full_path / "archive" / "change_log.json")
+
+#         if version_info:
+#             current_ver = version_info.get("version")
+#             create_version(full_path, parent_name=current_ver, summary="game.js 생성")
+#         else:
+#             create_version(full_path, summary="game.js 생성")
