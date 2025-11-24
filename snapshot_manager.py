@@ -13,14 +13,13 @@ import sys
 from base_dir import BASE_PUBLIC_DIR
 
 DEFAULT_IGNORE = [
-    "index.html",
-    "style.css",
     "archive/**",
     "change_log.json",
-    "chat_history.json",
     "meta.json",
-    "snapshot_manager.py",
-    "chat.json"
+    "chat.json",
+    "index.html",
+    "style.css",
+    "tsconfig.json"
 ]
 
 ARCHIVE_DIRNAME = "archive"
