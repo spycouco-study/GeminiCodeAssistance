@@ -34,19 +34,17 @@ import ffmpeg
 app = FastAPI(title="Gemini Code Assistant API")
 
 # ⚠️ CORS 설정: 클라이언트 브라우저가 요청을 보내도록 허용
-# 개발 환경(예: http://localhost:5500)에서 실행되는 클라이언트 허용
 origins = [
-    "http://localhost",
-    "http://localhost:8080",
-    # 게임이 실행되는 클라이언트 주소를 추가해야 합니다.
+    "http://localhost:3000",      # React 앱 (추가 필요!)
+    "http://localhost:8080",      # 게임 iframe
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],  # 필요한 메서드만
+    allow_headers=["Content-Type", "Authorization"],  # 필요한 헤더만
 )
 
 
@@ -926,37 +924,91 @@ def load_chat_request(game_name: str = Query(..., min_length=1)):
 
 
 
-@app.post("/client-error")
-async def log_client_error(error_data: ClientError):
-    """
-    클라이언트로부터 전송된 오류 로그를 받아 처리합니다.
-    """
-    # 🌟 1. 로그 기록 (가장 중요)
-    print(f"[{error_data.time}] 💥 CLIENT RUNTIME ERROR 발생! ({error_data.type})")
-    print(f"  Version: {error_data.game_version}")
-    print(f"  Message: {error_data.message}")
+# @app.post("/client-error")
+# async def log_client_error(error_data: ClientError):
+#     """
+#     클라이언트로부터 전송된 오류 로그를 받아 처리합니다.
+#     """
+#     # 🌟 1. 로그 기록 (가장 중요)
+#     print(f"[{error_data.time}] 💥 CLIENT RUNTIME ERROR 발생! ({error_data.type})")
+#     print(f"  Version: {error_data.game_version}")
+#     print(f"  Message: {error_data.message}")
     
-    # if error_data.stack:
-    #     print(f"  Stack Trace:\n{error_data.stack[:200]}...") # 스택은 너무 길 수 있으므로 일부만 출력
+#     # if error_data.stack:
+#     #     print(f"  Stack Trace:\n{error_data.stack[:200]}...") # 스택은 너무 길 수 있으므로 일부만 출력
     
-    if error_data.stack:
-        stack_lines = error_data.stack.split('\n')
-        # 최대 10줄만 출력
-        output_lines = stack_lines[:5] 
+#     if error_data.stack:
+#         stack_lines = error_data.stack.split('\n')
+#         # 최대 10줄만 출력
+#         output_lines = stack_lines[:5] 
         
-        # 만약 10줄이 넘는다면 '...' 추가
-        if len(stack_lines) > 5:
-            output_lines.append("... (Full stack trace truncated)")
+#         # 만약 10줄이 넘는다면 '...' 추가
+#         if len(stack_lines) > 5:
+#             output_lines.append("... (Full stack trace truncated)")
 
-        print(f"  Stack Trace:\n{'\n'.join(output_lines)}")
+#         print(f"  Stack Trace:\n{'\n'.join(output_lines)}")
 
 
-    # 🌟 2. 실제 데이터베이스나 파일에 저장
-    # 예: log_to_database(error_data)
-    # 예: log_to_file(error_data)
+#     # 🌟 2. 실제 데이터베이스나 파일에 저장
+#     # 예: log_to_database(error_data)
+#     # 예: log_to_file(error_data)
 
-    # 클라이언트에게 성공적으로 받았음을 응답합니다.
-    return {"status": "success", "message": "Error logged successfully"}
+#     # 클라이언트에게 성공적으로 받았음을 응답합니다.
+#     return {"status": "success", "message": "Error logged successfully"}
+
+
+
+
+
+
+
+
+# 에러 데이터 모델 (수정 없음)
+class ErrorData(BaseModel):
+    type: str
+    # ... 기존 필드 유지
+    message: str
+    source: str
+    lineno: int
+    colno: int
+    stack: str
+    time: str
+    game_version: str
+
+# 에러 배치 모델 수정
+class ErrorBatch(BaseModel):
+    type: str  # "error-batch" 또는 "error-batch-final"
+    game_name: str  # 게임 이름 필드 추가
+    game_version: str
+    collected_at: str
+    error_count: int
+    error_report: str 
+    errors: List[ErrorData]
+
+@app.post("/client-error")
+async def receive_client_error(batch: ErrorBatch):
+    """
+    클라이언트에서 보낸 에러 배치 수신
+    """
+    
+    # 🔥 클라이언트가 생성한 최종 보고서 문자열을 바로 출력합니다.
+    # 이 문자열에는 헤더, 에러 목록, 5줄로 제한된 스택 트레이스 등
+    # 요청하신 모든 형식이 포함되어 있습니다.
+    print(batch.error_report)
+    save_chat(CHAT_PATH(batch.game_name), "bot", batch.error_report)
+    
+    # (선택 사항) 만약 원본 에러 데이터를 디버깅 용도로 별도 저장/처리하려면
+    # batch.errors를 사용하여 추가 로직을 구현할 수 있습니다.
+    # for error in batch.errors:
+    #     db.save(error)
+
+    return {"status": "success"}
+
+
+
+
+
+
 
 
 
