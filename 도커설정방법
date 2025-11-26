@@ -1,0 +1,9 @@
+requirement.txt 만들기
+
+Dockerfile 만들기
+
+빌드하기
+docker build -t 앱이름 .
+
+실행하기
+docker run -p 내부포트:외부포트 앱이름

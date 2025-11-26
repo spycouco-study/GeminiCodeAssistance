@@ -34,17 +34,16 @@ import ffmpeg
 app = FastAPI(title="Gemini Code Assistant API")
 
 # ⚠️ CORS 설정: 클라이언트 브라우저가 요청을 보내도록 허용
-origins = [
-    "http://localhost:3000",      # React 앱 (추가 필요!)
-    "http://localhost:8080",      # 게임 iframe
-]
+# 환경 변수에서 CORS origins 읽어오기 (쉼표로 구분된 문자열)
+cors_origins_str = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080')
+origins = [origin.strip() for origin in cors_origins_str.split(',')]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],  # 필요한 메서드만
-    allow_headers=["Content-Type", "Authorization"],  # 필요한 헤더만
+    allow_methods=["*"],  # 필요한 메서드만
+    allow_headers=["Content-Type", "Authorization", "Cache-Control"],  # 필요한 헤더만
 )
 
 
