@@ -336,7 +336,7 @@ def build_with_esbuild(ts_file_path, output_path=None, format='esm', target='es2
 
 
 def check_typescript_compile_error(file_path:Path):
-    print(f"📄 {file_path.name} 파일을 {CONFIG_FILE_NAME} 설정으로 검사 시작...")
+    print(f"📄 {file_path.name} 파일을 tsconfig.json 설정으로 검사 시작...")
 
     #analysis_result = check_typescript_errors(file_path)
     analysis_result = check_typescript_errors_with_options(file_path)
