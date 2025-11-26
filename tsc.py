@@ -6,7 +6,7 @@ import json
 import sys
 from typing import Dict, Any, List
 
-from base_dir import BASE_DIR, BASE_PUBLIC_DIR
+from base_dir import BASE_PUBLIC_DIR
 
 
 
@@ -61,7 +61,7 @@ from base_dir import BASE_DIR, BASE_PUBLIC_DIR
 
 
 
-def check_typescript_errors_with_options(config_path: str, ts_file_path: str) -> Dict[str, Any]:
+def check_typescript_errors_with_options(ts_file_path: str) -> Dict[str, Any]:
     # # # 1. tsconfig.json 파일에서 컴파일러 옵션 로드 (이 부분은 동일)
     # try:
     #     with open(config_path, 'r', encoding='utf-8') as f:
@@ -331,15 +331,15 @@ def build_with_esbuild(ts_file_path, output_path=None, format='esm', target='es2
 
 
 
-CONFIG_FILE_NAME = "tsconfig.json"
-CONFIG_CODE_PATH = BASE_DIR / CONFIG_FILE_NAME
+#CONFIG_FILE_NAME = "tsconfig.json"
+#CONFIG_CODE_PATH = BASE_DIR / CONFIG_FILE_NAME
 
 
 def check_typescript_compile_error(file_path:Path):
     print(f"📄 {file_path.name} 파일을 {CONFIG_FILE_NAME} 설정으로 검사 시작...")
 
     #analysis_result = check_typescript_errors(file_path)
-    analysis_result = check_typescript_errors_with_options(CONFIG_CODE_PATH, file_path)
+    analysis_result = check_typescript_errors_with_options(file_path)
     build_with_esbuild(file_path)
 
     print("\n--- 검사 결과 ---")

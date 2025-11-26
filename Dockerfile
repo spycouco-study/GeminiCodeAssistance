@@ -30,5 +30,7 @@ ENV PORT=8000
 # 포트 노출
 EXPOSE 8000
 
-# 애플리케이션 실행
-CMD ["uvicorn", "gemini:app", "--host", "0.0.0.0", "--port", "8000"]
+# 애플리케이션 실행(배포용)
+#CMD ["uvicorn", "gemini:app", "--host", "0.0.0.0", "--port", "8000"]
+# 애플리케이션 실행(개발용)
+CMD ["uvicorn", "gemini:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
