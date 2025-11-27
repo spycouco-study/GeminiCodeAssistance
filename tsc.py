@@ -11,6 +11,52 @@ from base_dir import BASE_PUBLIC_DIR
 
 
 
+def fix_url_import_js(line: str) -> str:
+    """
+    URL import에서 .js 확장자가 없으면 붙이고,
+    줄바꿈 유지 + 세미콜론 추가
+    """
+    pattern = r'(import\s+.*\s+from\s+["\'])([^"\']+)(["\'])'
+    match = re.match(pattern, line.strip())
+
+    if not match:
+        # import가 아닌 줄은 그대로 반환
+        return line.rstrip("\n") + "\n"
+
+    prefix, path, suffix = match.groups()
+
+    # URL import만 처리
+    if path.startswith(("http://", "https://", "https://cdn.jsdelivr.net/", "https://unpkg.com/", "three/")):
+        if not re.search(r'\.\w+$', path):
+            path += ".js"
+
+    # 세미콜론 추가
+    return f"{prefix}{path}{suffix};\n"
+
+
+def fix_file_imports(file_path: str):
+    """
+    파일 내 모든 줄을 처리하고, 백업 생성
+    """
+    path = Path(file_path)
+    if not path.is_file():
+        print(f"{file_path} not found")
+        return
+
+    # 원본 백업
+    backup_path = path.with_suffix(".ts.bak")
+    path.replace(backup_path)
+
+    with backup_path.open("r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    fixed_lines = [fix_url_import_js(line) for line in lines]
+
+    with path.open("w", encoding="utf-8") as f:
+        f.writelines(fixed_lines)
+
+    print(f"Processed {file_path} (backup saved as {backup_path})")
+
 
 # def check_typescript_file(config_path: Path, game_name: str) -> Dict[str, Any]:
 #     """
@@ -120,27 +166,8 @@ def check_typescript_errors_with_options(ts_file_path: str) -> Dict[str, Any]:
 
     config_dir = os.path.dirname(ts_file_path)
 
-
-
-    
-
-
-
-
-
-
     # 4. 명령어 실행 (shell=True가 포함되어 있다고 가정)
     try:
-        # #shell=True를 반드시 포함해야 npx 실행 오류가 발생하지 않습니다.
-        # result = subprocess.run(
-        #     command_args,
-        #     capture_output=True,
-        #     text=True,
-        #     check=False,
-        #     shell=True,
-        #     cwd=config_dir
-        # )
-
         project_file_name = 'tsconfig.json' 
 
         result = subprocess.run(
@@ -168,49 +195,49 @@ def check_typescript_errors_with_options(ts_file_path: str) -> Dict[str, Any]:
         }
 
 
-def check_typescript_errors(ts_file_path):
-    """
-    tsc로 TypeScript 파일의 타입 오류 체크
+# def check_typescript_errors(ts_file_path):
+#     """
+#     tsc로 TypeScript 파일의 타입 오류 체크
     
-    Args:
-        ts_file_path: TypeScript 파일 경로
+#     Args:
+#         ts_file_path: TypeScript 파일 경로
         
-    Returns:
-        dict: {'success': bool, 'errors': str}
-    """
-    try:
-        # 절대 경로로 변환
-        ts_file_path = os.path.abspath(ts_file_path)
-        file_name = os.path.basename(ts_file_path)
-        work_dir = os.path.dirname(os.path.dirname(os.path.dirname(ts_file_path)))
+#     Returns:
+#         dict: {'success': bool, 'errors': str}
+#     """
+#     try:
+#         # 절대 경로로 변환
+#         ts_file_path = os.path.abspath(ts_file_path)
+#         file_name = os.path.basename(ts_file_path)
+#         work_dir = os.path.dirname(os.path.dirname(os.path.dirname(ts_file_path)))
         
-        # # tsc로 타입 체크 (빌드 없이 검증만)
-        # result = subprocess.run(
-        #     ['npx', 'tsc', file_name, '--noEmit', '--skipLibCheck', 
-        #      '--target', 'ES2020', '--module', 'ES2020', 
-        #      '--lib', 'ES2020,DOM', '--moduleResolution', 'bundler'],
-        #     cwd=work_dir,
-        #     capture_output=True,
-        #     text=True,
-        #     shell=True  # Windows에서 npx 실행을 위해 필요
-        # )
+#         # # tsc로 타입 체크 (빌드 없이 검증만)
+#         # result = subprocess.run(
+#         #     ['npx', 'tsc', file_name, '--noEmit', '--skipLibCheck', 
+#         #      '--target', 'ES2020', '--module', 'ES2020', 
+#         #      '--lib', 'ES2020,DOM', '--moduleResolution', 'bundler'],
+#         #     cwd=work_dir,
+#         #     capture_output=True,
+#         #     text=True,
+#         #     shell=True  # Windows에서 npx 실행을 위해 필요
+#         # )
 
-        # tsc로 타입 체크 (빌드 없이 검증만)
-        result = subprocess.run(
-            ['npx', 'tsc', file_name, '--noEmit'],
-            cwd=work_dir,
-            capture_output=True,
-            text=True,
-            shell=True  # Windows에서 npx 실행을 위해 필요
-        )
+#         # tsc로 타입 체크 (빌드 없이 검증만)
+#         result = subprocess.run(
+#             ['npx', 'tsc', file_name, '--noEmit'],
+#             cwd=work_dir,
+#             capture_output=True,
+#             text=True,
+#             shell=True  # Windows에서 npx 실행을 위해 필요
+#         )
         
-        if result.returncode == 0:
-            return {'success': True, 'errors': None}
-        else:
-            return {'success': False, 'errors': result.stdout + result.stderr}
+#         if result.returncode == 0:
+#             return {'success': True, 'errors': None}
+#         else:
+#             return {'success': False, 'errors': result.stdout + result.stderr}
             
-    except Exception as e:
-        return {'success': False, 'errors': str(e)}
+#     except Exception as e:
+#         return {'success': False, 'errors': str(e)}
 
 
 
@@ -283,34 +310,28 @@ def build_with_esbuild(ts_file_path, output_path=None, format='esm', target='es2
         dict: {'success': bool, 'output': str, 'error': str}
     """
     try:
-        # 절대 경로로 변환
         ts_file_path = os.path.abspath(ts_file_path)
-        file_name = os.path.basename(ts_file_path)
-        work_dir = os.path.dirname(ts_file_path)
-        
-        # 출력 경로 설정
-        if output_path is None:
-            output_path = ts_file_path.replace('.ts', '.js')
-        
-        # esbuild 명령어 구성
+        output_path = os.path.abspath(output_path or ts_file_path.replace(".ts", ".js"))
+
         cmd = [
-            'npx', 'esbuild', file_name,
-            f'--outfile={os.path.basename(output_path)}',
+            'npx', 'esbuild', ts_file_path,
+            f'--outfile={output_path}',
             f'--format={format}',
             f'--target={target}'
         ]
-        
+
         if sourcemap:
             cmd.append(f'--sourcemap={sourcemap}')
-        
-        # esbuild 실행
+
         result = subprocess.run(
             cmd,
-            cwd=work_dir,
+            cwd=os.path.dirname(ts_file_path),
             capture_output=True,
             text=True,
-            shell=True  # Windows에서 npx 실행을 위해 필요
+            shell=False
         )
+
+        print(result)
         
         if result.returncode == 0:
             return {
@@ -339,7 +360,9 @@ def check_typescript_compile_error(file_path:Path):
     print(f"📄 {file_path.name} 파일을 tsconfig.json 설정으로 검사 시작...")
 
     #analysis_result = check_typescript_errors(file_path)
+    fix_file_imports(file_path)
     analysis_result = check_typescript_errors_with_options(file_path)
+
     build_with_esbuild(file_path)
 
     print("\n--- 검사 결과 ---")
