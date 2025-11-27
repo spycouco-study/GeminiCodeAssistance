@@ -19,7 +19,8 @@ DEFAULT_IGNORE = [
     "chat.json",
     "index.html",
     "style.css",
-    "tsconfig.json"
+    "tsconfig.json",
+    "*.bak"
 ]
 
 ARCHIVE_DIRNAME = "archive"
