@@ -48,8 +48,8 @@ def create_project_structure(target_path: str):
                     print(f"   -> 파일 복사 완료: {filename}")
                 else:
                     print(f"⚠️ 경고: 소스 파일이 존재하지 않습니다: {source_file}")
-            else:
-                print(f"대상 파일이 이미 존재합니다.: {dest_file}")
+            # else:
+            #     print(f"대상 파일이 이미 존재합니다.: {dest_file}")
 
         # 4. 'assets' 폴더 생성
         assets_dir = DEST_DIR / "assets"
@@ -58,7 +58,7 @@ def create_project_structure(target_path: str):
             assets_dir.mkdir(exist_ok=True)
             print(f"   -> 폴더 생성 완료: {assets_dir.name}/")
 
-        print("\n✨ index.html, style.css, favicon.png, tsconfig.json 존재 확인 됨.")
+        #print("\n✨ index.html, style.css, favicon.png, tsconfig.json 존재 확인 됨.")
 
     except FileNotFoundError:
         print(f"\n❌ 오류: 소스 디렉토리 ({SOURCE_DIR})를 찾을 수 없습니다. 경로를 확인해주세요.")

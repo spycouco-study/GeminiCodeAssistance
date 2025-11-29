@@ -2,6 +2,8 @@ import json
 import os
 import shutil
 
+from base_dir import PROJECT_ROOT
+
 # 1. 입력 JSON 데이터
 json_str = '''{
     "game": {
@@ -50,28 +52,28 @@ json_str = '''{
 }'''
 
 # 2. 설정 변수
-DUMMY_DIR = 'dummy_data/dummy_sound'   # 더미 사운드 파일이 있는 폴더
+DUMMY_DIR = PROJECT_ROOT / 'dummy_data' / 'dummy_sound'   # 더미 사운드 파일이 있는 폴더
 #TARGET_DIR = 'assets' # 사운드 파일이 복사될 타겟 폴더
-TARGET_DIR = os.path.dirname(os.path.abspath(__file__)) # 현재 스크립트 디렉토리
+#TARGET_DIR = os.path.dirname(os.path.abspath(__file__)) # 현재 스크립트 디렉토리
 DUMMY_BGM = os.path.join(DUMMY_DIR, 'bgm.mp3') # 더미 BGM 파일 경로
 DUMMY_SFX = os.path.join(DUMMY_DIR, 'sfx.mp3') # 더미 SFX 파일 경로
 
 
-def prepare_dummy_files():
-    """테스트를 위해 더미 파일과 디렉토리를 생성합니다."""
-    # 더미 폴더 및 타겟 폴더 생성
-    os.makedirs(DUMMY_DIR, exist_ok=True)
-    os.makedirs(TARGET_DIR, exist_ok=True)
+# def prepare_dummy_files():
+#     """테스트를 위해 더미 파일과 디렉토리를 생성합니다."""
+#     # 더미 폴더 및 타겟 폴더 생성
+#     os.makedirs(DUMMY_DIR, exist_ok=True)
+#     os.makedirs(TARGET_DIR, exist_ok=True)
     
-    # 더미 BGM 파일 생성 (빈 파일)
-    with open(DUMMY_BGM, 'w') as f:
-        f.write('This is dummy BGM content.')
-    print(f"✅ 더미 BGM 파일 생성: {DUMMY_BGM}")
+#     # 더미 BGM 파일 생성 (빈 파일)
+#     with open(DUMMY_BGM, 'w') as f:
+#         f.write('This is dummy BGM content.')
+#     print(f"✅ 더미 BGM 파일 생성: {DUMMY_BGM}")
         
-    # 더미 SFX 파일 생성 (빈 파일)
-    with open(DUMMY_SFX, 'w') as f:
-        f.write('This is dummy SFX content.')
-    print(f"✅ 더미 SFX 파일 생성: {DUMMY_SFX}")
+#     # 더미 SFX 파일 생성 (빈 파일)
+#     with open(DUMMY_SFX, 'w') as f:
+#         f.write('This is dummy SFX content.')
+#     print(f"✅ 더미 SFX 파일 생성: {DUMMY_SFX}")
 
 
 def copy_and_rename_sound_files(data, base_directory):
@@ -103,7 +105,7 @@ def copy_and_rename_sound_files(data, base_directory):
         print("❌ 오류: 더미 사운드 파일 (bgm.mp3 또는 sfx.mp3)이 dummy_sound 폴더에 없습니다. 작업을 중단합니다.")
         return
 
-    print(f"\n--- 사운드 파일 복사 및 이름 변경 시작 (타겟 경로: {target_directory}) ---")
+    #print(f"\n--- 사운드 파일 복사 및 이름 변경 시작 (타겟 경로: {target_directory}) ---")
 
     for item in sounds_to_process:
         target_file_name = os.path.basename(item.get('path'))
@@ -137,15 +139,15 @@ def copy_and_rename_sound_files(data, base_directory):
         
         # 3. 파일 복사 및 이름 변경
         try:
-            if os.path.exists(target_path):
-                print(f"   (SKIP) 파일이 이미 존재합니다: {target_file_name}")
-            else:
+            if not os.path.exists(target_path):
                 shutil.copy2(source_dummy_path, target_path)
                 print(f"   ✅ 복사 완료: '{os.path.basename(source_dummy_path)}' -> '{target_file_name}' ({selection_reason})")
+            # else:
+            #     print(f"   (SKIP) 파일이 이미 존재합니다: {target_file_name}")
         except Exception as e:
             print(f"   ❌ 복사 중 오류 발생: {target_file_name} - {e}")
 
-    print("--- 사운드 파일 복사 및 이름 변경 완료 ---")
+    #print("--- 사운드 파일 복사 및 이름 변경 완료 ---")
 
 # 1. 더미 파일 및 폴더 준비 (실제 mp3 파일이 없으므로 테스트를 위해 빈 파일 생성)
 #prepare_dummy_files()

@@ -45,15 +45,32 @@ def fix_file_imports(file_path: str):
     backup_path = path.with_suffix(".ts.bak")
     path.replace(backup_path)
 
-    with backup_path.open("r", encoding="utf-8") as f:
-        lines = f.readlines()
+    try:
+        with backup_path.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
 
-    fixed_lines = [fix_url_import_js(line) for line in lines]
+        fixed_lines = [fix_url_import_js(line) for line in lines]
 
-    with path.open("w", encoding="utf-8") as f:
-        f.writelines(fixed_lines)
+        with path.open("w", encoding="utf-8") as f:
+            f.writelines(fixed_lines)
 
-    print(f"Processed {file_path} (backup saved as {backup_path})")
+    except Exception as e:
+        # 4. 처리 중 오류가 발생한 경우:
+        # 백업 파일을 유지하여 원본 내용을 복구할 수 있도록 합니다.
+        print(f"Error processing {file_path}. Backup retained at {backup_path}")
+        print(f"Error details: {e}")
+        # 필요하다면 오류를 다시 발생시켜 호출자에게 실패를 알립니다.
+        raise
+
+    else:
+        # 5. try 블록이 오류 없이 성공적으로 완료된 경우에만 실행:
+        # 백업 파일을 삭제합니다.
+        backup_path.unlink() 
+        #print(f"Processed {file_path} (Backup successfully deleted)")
+
+
+
+
 
 
 # def check_typescript_file(config_path: Path, game_name: str) -> Dict[str, Any]:

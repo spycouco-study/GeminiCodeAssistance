@@ -31,7 +31,7 @@ json_str = '''{
 # TARGET_DIR은 이제 경로 전체를 처리하므로, 저장할 파일의 디렉토리를 TARGET_DIR로 설정합니다.
 # 이 예시에서는 TARGET_DIR을 'assets' 폴더의 상위 폴더(현재 스크립트가 실행되는 곳)로 가정하고
 # 파일 경로(item['path'])를 사용하여 assets 폴더 내에 파일을 생성하도록 코드를 변경했습니다.
-TARGET_DIR = os.path.dirname(os.path.abspath(__file__)) # 현재 스크립트 디렉토리
+#TARGET_DIR = os.path.dirname(os.path.abspath(__file__)) # 현재 스크립트 디렉토리
 
 # 폰트 설정 (시스템에 존재하는 폰트 경로를 사용하거나, .ttf 파일을 직접 지정)
 try:
@@ -115,9 +115,7 @@ def check_and_create_images_with_text(data, base_directory):
         final_save_path = os.path.join(target_directory, file_name)
 
 
-        if os.path.exists(final_save_path):
-            print(f"👍 파일이 이미 존재합니다: {final_save_path}")
-        else:
+        if not os.path.exists(final_save_path):
             color = generate_unique_rgb_color(index, total_items)
 
             try:
@@ -146,6 +144,8 @@ def check_and_create_images_with_text(data, base_directory):
                 print(f"✨ 파일 생성: {final_save_path} ({width}x{height}, 고유 색상: {color}, 텍스트 추가됨)")
             except Exception as e:
                 print(f"❌ 이미지 생성 중 오류 발생: {final_save_path} - {e}")
+        # else:                
+        #     print(f"👍 파일이 이미 존재합니다: {final_save_path}")
 
 
 

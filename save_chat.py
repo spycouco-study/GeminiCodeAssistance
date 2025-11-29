@@ -63,7 +63,8 @@ def save_chat(file_path: str, sender: Sender, text: str):
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
             
-        print(f"✅ 채팅 기록 추가 성공: [{sender}] '{text[:20]}...' -> {file_path}")
+        #print(f"✅ 채팅 기록 추가 성공: [{sender}] '{text[:20]}...' -> {file_path}")
+        print(f"✅ 채팅 기록 추가 성공: [{sender}] '{text[:20]}...'")
         
     except Exception as e:
         print(f"❌ 파일 쓰기 오류: {e}")

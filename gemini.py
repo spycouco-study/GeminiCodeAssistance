@@ -544,7 +544,7 @@ def modify_code(request, question, game_name):
         error = validate_json(game_data)
 
         json_data = json.loads(game_data)
-        print(json_data.get('assets', {}))
+        #print(json_data.get('assets', {}))
 
         check_and_create_images_with_text(json_data, GAME_DIR(game_name))
         copy_and_rename_sound_files(json_data, GAME_DIR(game_name))
