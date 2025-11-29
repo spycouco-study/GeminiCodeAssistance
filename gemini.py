@@ -33,6 +33,9 @@ import ffmpeg
 # FastAPI 앱 인스턴스 생성
 app = FastAPI(title="Gemini Code Assistant API")
 
+# 환경 변수 로드
+load_dotenv()
+
 # ⚠️ CORS 설정: 클라이언트 브라우저가 요청을 보내도록 허용
 # 환경 변수에서 CORS origins 읽어오기 (쉼표로 구분된 문자열)
 cors_origins_str = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080')
@@ -47,13 +50,6 @@ app.add_middleware(
 )
 
 
-
-
-
-
-
-# 환경 변수 로드
-load_dotenv()
 
 # Gemini API 초기화
 gemini_api_key = os.getenv('GEMINI_API_KEY')
@@ -248,25 +244,25 @@ CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\Ga
 
 
 def GAME_DIR(game_name:str):
-    return BASE_PUBLIC_DIR / game_name
+    return BASE_PUBLIC_DIR() / game_name
 
 def CODE_PATH(game_name:str):
-    return BASE_PUBLIC_DIR / game_name / "game.ts"
+    return BASE_PUBLIC_DIR() / game_name / "game.ts"
 
 def DATA_PATH(game_name:str):
-    return BASE_PUBLIC_DIR / game_name / "data.json"
+    return BASE_PUBLIC_DIR() / game_name / "data.json"
 
 def SPEC_PATH(game_name:str):
-    return BASE_PUBLIC_DIR / game_name / "spec.md"
+    return BASE_PUBLIC_DIR() / game_name / "spec.md"
 
 def CHAT_PATH(game_name:str):
-    return BASE_PUBLIC_DIR / game_name / "chat.json"
+    return BASE_PUBLIC_DIR() / game_name / "chat.json"
 
 def ASSETS_PATH(game_name:str):
-    return BASE_PUBLIC_DIR / game_name / "assets"
+    return BASE_PUBLIC_DIR() / game_name / "assets"
 
 def ARCHIVE_LOG_PATH(game_name:str):
-     return BASE_PUBLIC_DIR / game_name / "archive" / "change_log.json"
+     return BASE_PUBLIC_DIR() / game_name / "archive" / "change_log.json"
 
 
 
@@ -1309,8 +1305,8 @@ async def revert_code(request: RevertRequest):
 
 
 
-# 💡 모든 게임 폴더를 담고 있는 상위 루트 폴더를 지정합니다.
-GAMES_ROOT_DIR = BASE_PUBLIC_DIR.resolve() 
+# # 💡 모든 게임 폴더를 담고 있는 상위 루트 폴더를 지정합니다.
+# GAMES_ROOT_DIR = BASE_PUBLIC_DIR().resolve() 
 
 # Pydantic 모델 (AssetItem의 URL 구조만 변경됩니다)
 class AssetItem(BaseModel):
@@ -1328,7 +1324,7 @@ class AssetsResponse(BaseModel):
 def get_assets(game_name: str = Query(..., alias="game_name")):
     
     # 1. assets 폴더 경로 (images/sounds 하위 폴더 없음)
-    assets_dir = GAMES_ROOT_DIR / game_name / "assets"
+    assets_dir = BASE_PUBLIC_DIR() / game_name / "assets"
 
     images: List[AssetItem] = []
     sounds: List[AssetItem] = []
@@ -1364,14 +1360,14 @@ async def serve_selective_static_file(game_name: str, file_path: str):
         raise HTTPException(status_code=403, detail="Access denied. Only files within the 'assets' subdirectory are accessible.")
 
     # 2. 파일의 실제 경로 구성
-    # 예: GAMES_ROOT_DIR / game_a / assets / image.png
-    full_path = GAMES_ROOT_DIR / game_name / file_path
+    # 예: BASE_PUBLIC_DIR() / game_a / assets / image.png
+    full_path = BASE_PUBLIC_DIR() / game_name / file_path
     
     # 3. 경로 조작 공격 방지 (보안 강화)
     try:
         resolved_path = full_path.resolve()
         
-        if not resolved_path.is_relative_to(GAMES_ROOT_DIR):
+        if not resolved_path.is_relative_to(BASE_PUBLIC_DIR()):
              raise HTTPException(status_code=403, detail="Invalid path traversal attempt.")
 
     except Exception:
@@ -1403,7 +1399,7 @@ def _is_safe_filename(name: str) -> bool:
 
 def _ensure_under_root(path: Path):
     try:
-        if not path.resolve().is_relative_to(GAMES_ROOT_DIR):
+        if not path.resolve().is_relative_to(BASE_PUBLIC_DIR()):
             raise HTTPException(status_code=403, detail="Invalid path traversal")
     except Exception:
         raise HTTPException(status_code=403, detail="Invalid path traversal")
@@ -1422,7 +1418,7 @@ async def replace_asset(
     if not _is_safe_filename(old_name):
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    assets_dir = (GAMES_ROOT_DIR / game_name / "assets")
+    assets_dir = (BASE_PUBLIC_DIR() / game_name / "assets")
     _ensure_under_root(assets_dir)
     assets_dir.mkdir(parents=True, exist_ok=True)
 

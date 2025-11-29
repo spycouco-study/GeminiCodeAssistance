@@ -5,6 +5,9 @@ import threading
 from typing import Any, List, Optional, Tuple
 
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class CodePromptTemplateProcessor:
     PROMPT_PATH = Path(__file__).parent / "playground" / "playground.py"

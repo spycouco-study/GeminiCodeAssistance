@@ -1,5 +1,13 @@
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
-# BASE_PUBLIC_DIR = Path(r"로컬PC의_게임서버_프로젝트_폴더_경로\public")
+load_dotenv()
 
-BASE_PUBLIC_DIR = Path("/app/public")
+def BASE_PUBLIC_DIR():
+    is_docker = os.getenv('RUNNING_IN_DOCKER', 'False') == 'True'
+    if is_docker:
+        return Path("/app/public")
+    else:
+        #return Path("../VerySimpleTypeScriptProject_AtoZ_Game/public")
+        return Path(__file__).resolve().parent.parent / "VerySimpleTypeScriptProject_AtoZ_Game" / "public"

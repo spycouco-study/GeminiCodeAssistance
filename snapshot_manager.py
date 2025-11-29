@@ -611,7 +611,7 @@ def main():
 
 
 
-root = BASE_PUBLIC_DIR / "sy_3d_dddd2"
+root = BASE_PUBLIC_DIR() / "sy_3d_dddd2"
 #root = Path.cwd() / "snapshot_test" / "test"
 #ignore = DEFAULT_IGNORE.copy()
 

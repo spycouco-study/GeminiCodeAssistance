@@ -4,9 +4,7 @@ import re
 import subprocess
 import json
 import sys
-from typing import Dict, Any, List
-
-from base_dir import BASE_PUBLIC_DIR
+from typing import Dict, Any
 
 
 
