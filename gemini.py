@@ -15,7 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from realtime import List
 
-from base_dir import BASE_PUBLIC_DIR
+from generate_image import generate_image
+from generate_sound import generate_sound
+from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
 from classes import PromptDeviderProcessor, AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor, SpecQuestionTemplateProcessor
 from make_default_game_folder import create_project_structure
 from make_dummy_image_asset import check_and_create_images_with_text
@@ -27,7 +29,7 @@ from tsc import check_typescript_compile_error
 
 from PIL import Image 
 
-import ffmpeg
+#import ffmpeg
 #from supabase import format_chat_history, get_session_history
 
 # FastAPI 앱 인스턴스 생성
@@ -243,28 +245,6 @@ CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\Ga
 
 
 
-def GAME_DIR(game_name:str):
-    return BASE_PUBLIC_DIR() / game_name
-
-def CODE_PATH(game_name:str):
-    return BASE_PUBLIC_DIR() / game_name / "game.ts"
-
-def DATA_PATH(game_name:str):
-    return BASE_PUBLIC_DIR() / game_name / "data.json"
-
-def SPEC_PATH(game_name:str):
-    return BASE_PUBLIC_DIR() / game_name / "spec.md"
-
-def CHAT_PATH(game_name:str):
-    return BASE_PUBLIC_DIR() / game_name / "chat.json"
-
-def ASSETS_PATH(game_name:str):
-    return BASE_PUBLIC_DIR() / game_name / "assets"
-
-def ARCHIVE_LOG_PATH(game_name:str):
-     return BASE_PUBLIC_DIR() / game_name / "archive" / "change_log.json"
-
-
 
 # # 이전 버전 경로 (BASE_OLD_DIR / GAME_NAME)
 # def OLD_GAME_DIR(game_name:str):
@@ -384,10 +364,10 @@ def parse_ai_code_response(response_text):
     result['game_data'] = json_string
     
     # 3. 필요 Asset 리스트 (JSON 문자열)
-    asset_start = response_text.find("###ASSET_LIST_START###") + len("###ASSET_LIST_START###")
-    asset_end = response_text.find("###ASSET_LIST_END###")
+    asset_start = response_text.find("###NEW_ASSET_START###") + len("###NEW_ASSET_START###")
+    asset_end = response_text.find("###NEW_ASSET_END###")
     json_asset_string = response_text[asset_start:asset_end].strip()
-    result['asset_list'] = json_asset_string
+    result['new_asset_list'] = json_asset_string
 
     # 4. 설명 블록 추출
     desc_start = response_text.find("###DESCRIPTION_START###") + len("###DESCRIPTION_START###")
@@ -497,7 +477,8 @@ def modify_code(request, question, game_name):
     game_code = remove_code_fences_safe(responseData['game_code'])
     game_data = remove_code_fences_safe(responseData['game_data'])
     description = remove_code_fences_safe(responseData['description'])
-    #asset_list = remove_code_fences_safe(responseData['asset_list'])
+    new_asset_list = remove_code_fences_safe(responseData['new_asset_list'])
+    
     # asset_list = json.loads(asset_list)
     # print(asset_list)
     # check_and_create_images(asset_list, ASSETS_PATH)
@@ -559,6 +540,32 @@ def modify_code(request, question, game_name):
         modify_check = modify_check + "< data.json : 수정 O >\n"
     else:
         modify_check = modify_check + "< data.json : 수정 X >\n"
+
+
+    
+    if new_asset_list:        
+        error = error + validate_json(new_asset_list)
+        json_new_asset_list = json.loads(new_asset_list)
+        print(json_new_asset_list)
+
+        for img in json_new_asset_list.get('images', []):
+            generate_image(
+                game_name=game_name,
+                file_name=img['file_name'],
+                description=img['description'],
+                isBackgroundImage=img['isBackgroundImage'],
+                width=img['width'],
+                height=img['height']
+            )
+
+        # for snd in json_new_asset_list.get('sounds', []):
+        #     generate_sound(
+        #         game_name=game_name,
+        #         file_name=snd['file_name'],
+        #         description=snd['description'],
+        #         isBackgroundMusic=snd['isBackgroundMusic'],
+        #         duration_seconds=snd['duration_seconds']
+        #     )
 
 
     description = modify_check + description
@@ -1453,19 +1460,19 @@ async def replace_asset(
         else:  # sound
             if ext == ".mp3":
                 shutil.copyfile(tmp_path, dst_path)
-            else:
-                # audio = AudioSegment.from_file(tmp_path)
-                # audio.export(dst_path, format="mp3", bitrate="192k")
+            # else:
+            #     # audio = AudioSegment.from_file(tmp_path)
+            #     # audio.export(dst_path, format="mp3", bitrate="192k")
                 
-                # ffmpeg를 사용해 mp3로 변환
-                cmd = [
-                    "ffmpeg",
-                    "-y",
-                    "-i", str(tmp_path),
-                    "-b:a", "192k",
-                    str(dst_path)
-                ]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            #     # ffmpeg를 사용해 mp3로 변환
+            #     cmd = [
+            #         "ffmpeg",
+            #         "-y",
+            #         "-i", str(tmp_path),
+            #         "-b:a", "192k",
+            #         str(dst_path)
+            #     ]
+            #     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # 이전 파일명이 다르면(확장자 변경) 기존 파일 제거
         try:

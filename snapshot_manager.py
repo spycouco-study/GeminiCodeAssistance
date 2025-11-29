@@ -10,7 +10,8 @@ import fnmatch
 import os
 import sys
 
-from base_dir import BASE_PUBLIC_DIR
+
+from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
 
 DEFAULT_IGNORE = [
     "archive/**",

@@ -22,7 +22,7 @@ root/
 응답은 반드시 아래의 커스텀 형식에 맞춰주세요. 어떠한 설명이나 마크다운 구문(```)도 태그 외부에 넣지 마세요. 태그 내부에는 아래에 명시된 지침문은 제거하고 생성한 내용만 넣으세요.
 
 ###CODE_START###
-game.ts에 저장될 TypeScript 코드를 이곳에 넣으세요.
+game.ts에 저장될 TypeScript 코드 전체를 이곳에 넣으세요.
 ###CODE_END###
 
 ###DATA_START###
@@ -39,6 +39,18 @@ data.json에 저장될 JSON 데이터 전체를 이곳에 넣으세요.
 ]
 }}
 ###DATA_END###
+
+###NEW_ASSET_START###
+새로운 Asset이 추가된 경우, 각 Asset을 생성하기 위해 AI에게 전달해야하는 description을 아래 예시와 같은 JSON 형식으로 작성해 주세요. 새로운 Asset이 추가되지 않았다면 비워두세요. 이미지는 file_name, isBackgroundImage, width, height를 반드시 포함해 주세요. BackgroundImage가 아닌 경우 배경제거 후처리 작업이 원활하도록 object와 대비되는 plain color로 여백을 채우도록 하는 지시문을 description에 추가해 주세요. 사운드는 file_name, isBackgroundMusic, duration_seconds 반드시 포함시켜 주세요. 각 에셋은 게임의 구도, 분위기, 톤의 일관성을 유지하도록 해주세요.
+{{
+    "images": [
+        {{ "file_name": str, "description": str, "isBackgroundImage": boolean, "width": int, "height": int }}
+],
+"sounds": [
+{{ "file_name": str, "description": str, "isBackgroundMusic": boolean, "duration_seconds": int }}
+]
+}}
+###NEW_ASSET_END###
 
 ###DESCRIPTION_START###
 작업한 내용에 대한 간단한 설명을 이곳에 넣으세요.

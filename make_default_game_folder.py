@@ -3,6 +3,8 @@ import shutil
 from pathlib import Path
 import sys
 
+from base_dir import PROJECT_ROOT
+
 def create_project_structure(target_path: str):
     """
     주어진 경로에 기본 파일들을 복사하고 'assets' 폴더를 생성합니다.
@@ -17,10 +19,10 @@ def create_project_structure(target_path: str):
     # 간단하게 현재 작업 디렉토리를 기준으로 설정하겠습니다.
     
     # 주의: 실제 환경에서는 BASE_DIR을 프로젝트 루트로 정확히 지정해야 합니다.
-    BASE_DIR = Path(__file__).resolve().parent if '__file__' in locals() else Path(os.getcwd())
+    #BASE_DIR = Path(__file__).resolve().parent if '__file__' in locals() else Path(os.getcwd())
     
     # 소스 디렉토리 경로
-    SOURCE_DIR = BASE_DIR / "dummy_data" / "default_files" 
+    SOURCE_DIR = PROJECT_ROOT / "dummy_data" / "default_files" 
     
     # 대상 디렉토리 경로 (사용자 입력)
     DEST_DIR = Path(target_path)

@@ -14,9 +14,11 @@ pydantic
 
 # Image processing
 Pillow
+rembg
+onnxruntime
 
 # Video processing
-ffmpeg-python
+#ffmpeg-python
 
 # Real-time communication
 realtime

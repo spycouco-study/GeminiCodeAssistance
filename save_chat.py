@@ -26,7 +26,7 @@ def save_chat(file_path: str, sender: Sender, text: str):
             file.parent.mkdir(parents=True, exist_ok=True) # 부모 폴더가 없다면 생성
             with open(file, 'w', encoding='utf-8') as f:
                 json.dump(initial_data, f, ensure_ascii=False, indent=4)
-            print(f"💡 {file_path} 파일이 새로 생성되었습니다.")
+            #print(f"💡 {file_path} 파일이 새로 생성되었습니다.")
         except Exception as e:
             print(f"❌ 파일 생성 오류: {e}")
             return

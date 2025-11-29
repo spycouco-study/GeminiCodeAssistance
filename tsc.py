@@ -1,10 +1,14 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import json
 import sys
 from typing import Dict, Any
+
+
+from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
 
 
 
@@ -325,11 +329,19 @@ def build_with_esbuild(ts_file_path, output_path=None, format='esm', target='es2
         dict: {'success': bool, 'output': str, 'error': str}
     """
     try:
+        # 1. npx 실행 파일의 전체 경로를 찾습니다.
+        npx_path = shutil.which('npx')
+
+        if not npx_path:
+            # npx가 PATH에 없으면 예외를 발생시키거나 오류 처리를 합니다.
+            # Docker 환경에서 node/npm/npx가 제대로 설치되었는지 확인해야 합니다.
+            raise FileNotFoundError("npx 실행 파일을 시스템 PATH에서 찾을 수 없습니다. Node.js/npm 설치를 확인하세요.")
+
         ts_file_path = os.path.abspath(ts_file_path)
         output_path = os.path.abspath(output_path or ts_file_path.replace(".ts", ".js"))
 
         cmd = [
-            'npx', 'esbuild', ts_file_path,
+            npx_path, 'esbuild', ts_file_path,
             f'--outfile={output_path}',
             f'--format={format}',
             f'--target={target}'
@@ -427,5 +439,5 @@ def check_typescript_compile_error(file_path:Path):
 
 
 
-#check_typescript_compile_error(Path(BASE_PUBLIC_DIR) / "sy_vampire_survivors" / "game.ts")
-#check_typescript_compile_error(Path(BASE_PUBLIC_DIR) / "sy_3d_dddd2" / "game.ts")
+#check_typescript_compile_error(Path(BASE_PUBLIC_DIR()) / "sy_vampire_survivors" / "game.ts")
+#check_typescript_compile_error(Path(BASE_PUBLIC_DIR()) / "sy_shooting_game" / "game.ts")

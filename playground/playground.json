@@ -1,0 +1,45 @@
+{
+  "images": [
+    {
+      "file_name": "title_screen_bg.png",
+      "description": "A dark, atmospheric sci-fi background for a title screen. It should feature glowing neon lines, subtle circuit patterns, and a distant, futuristic city silhouette or starfield. The overall tone is cool, mysterious, and high-tech. Resolution 800x600.",
+      "isBackgroundImage": true,
+      "width": 800,
+      "height": 600
+    },
+    {
+      "file_name": "game_bg.png",
+      "description": "A subtle, dark sci-fi background for gameplay. It should be less busy than the title screen, featuring a sparse starfield, faint nebulous effects, and very subtle, glowing hexagonal or grid patterns. It should be non-distracting for active gameplay. Resolution 800x600.",
+      "isBackgroundImage": true,
+      "width": 800,
+      "height": 600
+    },
+    {
+      "file_name": "block_blue.png",
+      "description": "A square sci-fi block texture. It should have a metallic blue appearance with internal glowing light effects and subtle circuit lines across its surface. The edges should be crisp and defined. background: plain green #00ff00",
+      "isBackgroundImage": false,
+      "width": 64,
+      "height": 64
+    }
+  ],
+  "sounds": [
+    {
+      "file_name": "sfx_drop.mp3",
+      "description": "A short, distinct electronic 'thud' or 'snap' sound with a sci-fi feel, indicating a block has landed and locked into place on the grid. Crisp and immediate.",
+      "isBackgroundMusic": false,
+      "duration_seconds": 0.3
+    },
+    {
+      "file_name": "sfx_clear.mp3",
+      "description": "An uplifting, short electronic 'chime' or 'energy burst' sound effect, like a digital achievement or power-up, used when one or more lines are cleared. Should feel satisfying and futuristic.",
+      "isBackgroundMusic": false,
+      "duration_seconds": 0.5
+    },
+    {
+      "file_name": "sfx_rotate.mp3",
+      "description": "A quick, subtle electronic 'whir', 'blip', or 'click' sound for when a block is rotated. It should be light and responsive.",
+      "isBackgroundMusic": false,
+      "duration_seconds": 0.2
+    }
+  ]
+}
