@@ -440,4 +440,4 @@ def check_typescript_compile_error(file_path:Path):
 
 
 #check_typescript_compile_error(Path(BASE_PUBLIC_DIR()) / "sy_vampire_survivors" / "game.ts")
-#check_typescript_compile_error(Path(BASE_PUBLIC_DIR()) / "sy_shooting_game" / "game.ts")
+#check_typescript_compile_error(Path(BASE_PUBLIC_DIR()) / "sy_scifi_snake" / "game.ts")

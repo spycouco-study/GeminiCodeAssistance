@@ -6,8 +6,9 @@ import subprocess
 import tempfile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from google import genai
-from google.genai import types
+
+from model_info_gemini import gemini_client, model_name
+
 import os
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
@@ -15,8 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from realtime import List
 
-from generate_image import generate_image
-from generate_sound import generate_sound
+from generate_image import generate_image, run_image_generation_with_delay
+from generate_sound import generate_sounds
 from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
 from classes import PromptDeviderProcessor, AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor, SpecQuestionTemplateProcessor
 from make_default_game_folder import create_project_structure
@@ -26,6 +27,8 @@ from save_chat import load_chat, save_chat
 from snapshot_manager import create_version, find_current_version_from_file, restore_version
 from tools.debug_print import debug_print
 from tsc import check_typescript_compile_error
+
+from remove_code_fences_safe import remove_code_fences_safe
 
 from PIL import Image 
 
@@ -51,12 +54,6 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "Cache-Control"],  # 필요한 헤더만
 )
 
-
-
-# Gemini API 초기화
-gemini_api_key = os.getenv('GEMINI_API_KEY')
-model_name = "gemini-2.5-flash"
-#model_name = "gemini-3-pro-preview"
 
 # 요청 모델 정의
 class CodeRequest(BaseModel):
@@ -106,49 +103,6 @@ def remove_comments_from_file(file_path):
 
 
 
-def remove_code_fences_safe(code_string: str) -> str:
-    """
-    문자열의 맨 처음과 맨 끝에 있는 Markdown 코드 블록(```)을 안전하게 제거합니다.
-    시작과 끝 모두 백틱이 명확하게 존재하는지 검사합니다.
-    
-    Args:
-        code_string: 백틱으로 감싸인 코드 문자열.
-
-    Returns:
-        백틱이 제거된 순수한 코드 문자열.
-    """
-    # 1. 문자열 앞뒤의 공백/줄바꿈을 제거합니다.
-    stripped_string = code_string.strip()
-    
-    # 2. 앞쪽 백틱(```) 검사 및 제거
-    content_start = 0
-    if stripped_string.startswith('```'):
-        # 첫 줄바꿈 위치를 찾아 언어 지정(예: typescript) 부분을 건너뜁니다.
-        stripped_string = stripped_string.replace('\\n', '\n')
-        first_newline_index = stripped_string.find('\n')
-        
-        if first_newline_index != -1:
-            # '\n' 이후부터 코드가 시작됩니다.
-            content_start = first_newline_index + 1
-        else:
-            # 한 줄짜리 코드인 경우, 단순히 '```' 세 글자만 제거합니다.
-            content_start = 3
-    
-    # 앞쪽 백틱을 제거한 문자열
-    processed_string = stripped_string[content_start:]
-    
-    # 3. 뒤쪽 백틱(```) 검사 및 제거 (가장 명확한 검증 부분)
-    # 앞쪽을 제거한 문자열의 뒤쪽 공백/줄바꿈을 다시 정리합니다.
-    final_string = processed_string.rstrip() 
-    
-    if final_string.endswith('```'):
-        # 백틱 세 개가 명확하게 존재하면, 끝에서 세 글자를 제거합니다.
-        final_string = final_string[:-3]
-        
-    return final_string.strip() # 최종적으로 앞뒤 공백/줄바꿈 다시 정리
-
-
-
 
 def split_gemini_response_code(response_text):
     """
@@ -195,16 +149,7 @@ def split_gemini_response_code(response_text):
 
 
 
-# 환경 변수에서 API 키를 자동으로 가져옵니다.
-# 만약 환경 변수 설정을 건너뛰고 싶다면, 
-# client = genai.Client(api_key="YOUR_API_KEY") 와 같이 직접 전달할 수도 있습니다.
-try:
-    gemini_client = genai.Client(api_key=gemini_api_key)
-except Exception as e:
-    # 환경 변수가 설정되지 않은 경우를 처리
-    print(f"클라이언트 초기화 오류: {e}")
-    print("환경 변수 GEMINI_API_KEY가 설정되었는지 확인해 주세요.")
-    exit()
+
 
 
 
@@ -548,15 +493,21 @@ def modify_code(request, question, game_name):
         json_new_asset_list = json.loads(new_asset_list)
         print(json_new_asset_list)
 
-        for img in json_new_asset_list.get('images', []):
-            generate_image(
-                game_name=game_name,
-                file_name=img['file_name'],
-                description=img['description'],
-                isBackgroundImage=img['isBackgroundImage'],
-                width=img['width'],
-                height=img['height']
-            )
+        image_asset_info = json_new_asset_list.get('images', [])
+        run_image_generation_with_delay(game_name, image_asset_info, delay=6)
+
+        # for img in json_new_asset_list.get('images', []):
+        #     generate_image(
+        #         game_name=game_name,
+        #         file_name=img['file_name'],
+        #         description=img['description'],
+        #         isBackgroundImage=img['isBackgroundImage'],
+        #         width=img['width'],
+        #         height=img['height']
+        #     )
+
+        sound_asset_info = json_new_asset_list.get('sounds', [])
+        generate_sounds(game_name, sound_asset_info)
 
         # for snd in json_new_asset_list.get('sounds', []):
         #     generate_sound(

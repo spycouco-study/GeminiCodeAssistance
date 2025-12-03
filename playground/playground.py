@@ -1,21 +1,48 @@
 import os
-from dotenv import load_dotenv
-from google import genai
 
+# --- 사용자 설정 ---
+# 1. 파일 목록을 가져올 대상 폴더 경로
+TARGET_DIRECTORY = r"C:\Users\spyco\Desktop\final_project\GeminiCodeAssistance\dummy_data\sound_sources"  # 실제 경로로 변경하세요!
+# --------------------
 
-load_dotenv()
+def get_filenames_without_extension_as_comma_separated_string(directory_path):
+    """
+    지정된 폴더 내의 파일 목록을 가져와 확장자를 제외하고 콤마로 구분된 문자열로 반환합니다.
+    """
+    
+    # 1. 폴더 존재 여부 확인
+    if not os.path.isdir(directory_path):
+        return f"❌ 오류: 지정된 경로 '{directory_path}'가 존재하지 않거나 폴더가 아닙니다."
+    
+    # 2. 파일명 저장 리스트 초기화
+    names_without_ext = []
+    
+    try:
+        # 3. 폴더 내의 모든 항목을 가져옵니다.
+        for item_name in os.listdir(directory_path):
+            # 항목의 전체 경로
+            full_path = os.path.join(directory_path, item_name)
+            
+            # 폴더가 아닌 파일만 처리합니다.
+            if os.path.isfile(full_path):
+                # os.path.splitext(파일명) -> (확장자를 제외한 이름, 확장자) 튜플 반환
+                name_only, extension = os.path.splitext(item_name)
+                
+                # 확장자가 없는 이름만 리스트에 추가합니다.
+                names_without_ext.append(name_only)
+                
+        # 4. 리스트의 항목들을 콤마와 공백으로 구분된 하나의 문자열로 결합합니다.
+        result_string = ", ".join(names_without_ext)
+        
+        return result_string
+        
+    except PermissionError:
+        return f"❌ 오류: 폴더에 접근할 권한이 없습니다: {directory_path}"
+    except Exception as e:
+        return f"❌ 예상치 못한 오류 발생: {e}"
 
-# Gemini API 초기화
-gemini_api_key = os.getenv('GEMINI_API_KEY')
-# API 키 설정
-# genai.Client(api_key=os.environ.get("GEMINI_API_KEY")) 와 같이 환경 변수를 사용하는 것을 권장합니다.
-client = genai.Client(api_key=gemini_api_key) 
+# 함수 실행 및 결과 출력
+result = get_filenames_without_extension_as_comma_separated_string(TARGET_DIRECTORY)
 
-print("접근 가능한 모델 목록:")
-# client.models.list()는 모든 모델 목록을 가져옵니다.
-for model in client.models.list():
-    # 수정된 부분: model.supported_generation_methods -> model.supported_methods
-    # 'models/gemini'로 시작하고 'generateContent'를 지원하는 모델만 필터링합니다.
-    #if model.name.startswith("models/gemini") and "generateContent" in model.supported_methods:
-        # 출력된 모델 이름 (예: models/gemini-2.5-flash)을 코드에 사용하시면 됩니다.
-        print(f"- {model.name}")
+print("--- 처리 결과 ---")
+print(result)

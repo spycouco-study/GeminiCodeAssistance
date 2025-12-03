@@ -4,6 +4,9 @@ import time
 from io import BytesIO
 from PIL import Image
 from rembg import remove
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import random # 예시를 위한 임시 모듈
 
 
 from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
@@ -154,3 +157,45 @@ def generate_image_Pollinations_AI(
         return None
     
 
+def run_image_generation_with_delay(game_name, asset_list, delay):
+    # 사용할 최대 스레드 개수를 설정합니다. 일반적으로 CPU 코어 수의 몇 배를 사용합니다.
+    # 여기서는 예를 들어 5개의 스레드를 사용하도록 설정합니다.
+    MAX_WORKERS = 5
+    futures = []
+
+    # ThreadPoolExecutor를 'with' 문으로 사용하면 작업 완료 후 자동으로 정리됩니다.
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        print("--- 이미지 생성 작업 제출 시작 ---")
+        
+        # 이미지 목록을 순회하며 작업을 executor에 제출합니다.
+        for i, img in enumerate(asset_list):
+            if i > 0:
+                # 첫 번째 작업 이후부터 delay를 적용합니다.
+                print(f"다음 작업 제출까지 {delay}초 대기...")
+                time.sleep(delay)
+            
+            print(f"작업 {i+1} ({img['file_name']}) 제출...")
+            
+            # submit() 함수를 사용하여 generate_image 함수를 스레드 풀에 제출합니다.
+            future = executor.submit(
+                generate_image,
+                game_name=game_name,
+                file_name=img['file_name'],
+                description=img['description'],
+                isBackgroundImage=img['isBackgroundImage'],
+                width=img['width'],
+                height=img['height']
+            )
+            futures.append(future)
+
+        print("\n--- 모든 작업이 스레드 풀에 제출되었습니다. 완료 대기 중... ---")
+        
+        # as_completed를 사용하여 완료되는 순서대로 결과를 처리하고, 모든 작업이 끝날 때까지 기다립니다.
+        for future in as_completed(futures):
+            try:
+                result = future.result()  # 작업이 완료될 때까지 블록킹
+                print(f"메인 스레드에서 결과 수신: {result}")
+            except Exception as exc:
+                print(f"작업 중 예외 발생: {exc}")
+
+    print("\n--- 모든 이미지 생성 작업 완료! ---")
