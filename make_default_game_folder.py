@@ -5,67 +5,136 @@ import sys
 
 from base_dir import PROJECT_ROOT
 
+# def create_project_structure(target_path: str):
+#     """
+#     주어진 경로에 기본 파일들을 복사하고 'assets' 폴더를 생성합니다.
+
+#     Args:
+#         target_path (str): 파일을 복사하고 구조를 만들 대상 경로입니다.
+#     """
+    
+#     # 1. 소스 파일 및 폴더의 기준 경로 설정
+#     # 이 스크립트가 실행되는 디렉토리 기준으로 'dummy_data/default_files' 경로를 설정합니다.
+#     # sys.argv[0]를 사용하여 스크립트의 경로를 기준으로 설정하는 것이 안전하지만, 
+#     # 간단하게 현재 작업 디렉토리를 기준으로 설정하겠습니다.
+    
+#     # 주의: 실제 환경에서는 BASE_DIR을 프로젝트 루트로 정확히 지정해야 합니다.
+#     #BASE_DIR = Path(__file__).resolve().parent if '__file__' in locals() else Path(os.getcwd())
+    
+#     # 소스 디렉토리 경로
+#     SOURCE_DIR = PROJECT_ROOT / "dummy_data" / "default_files" 
+    
+#     # 대상 디렉토리 경로 (사용자 입력)
+#     DEST_DIR = Path(target_path)
+    
+#     # 복사할 파일 목록
+#     FILES_TO_COPY = ["index.html", "style.css", "favicon.png", "thumbnail.png", "tsconfig.json", "game_metadata.json"]
+    
+#     try:
+#         # 2. 대상 경로가 존재하는지 확인하고 없으면 생성
+#         # exist_ok=True: 이미 경로가 존재해도 오류가 발생하지 않음
+        
+#         if not os.path.exists(DEST_DIR):
+#             DEST_DIR.mkdir(parents=True, exist_ok=True)
+#             print(f"✅ 대상 디렉토리 준비 완료: {DEST_DIR}")
+
+#         # 3. 기본 파일 복사
+#         for filename in FILES_TO_COPY:
+#             source_file = SOURCE_DIR / filename
+#             dest_file = DEST_DIR / filename
+            
+#             if not dest_file.exists():
+#                 if source_file.exists():
+#                     # shutil.copy2는 파일 데이터와 메타데이터(수정 시간 등)를 모두 복사합니다.
+#                     shutil.copy2(source_file, dest_file)
+#                     print(f"   -> 파일 복사 완료: {filename}")
+#                 else:
+#                     print(f"⚠️ 경고: 소스 파일이 존재하지 않습니다: {source_file}")
+#             # else:
+#             #     print(f"대상 파일이 이미 존재합니다.: {dest_file}")
+
+#         # 4. 'assets' 폴더 생성
+#         assets_dir = DEST_DIR / "assets"
+
+#         if not os.path.exists(assets_dir):
+#             assets_dir.mkdir(exist_ok=True)
+#             print(f"   -> 폴더 생성 완료: {assets_dir.name}/")
+
+#         #print("\n✨ index.html, style.css, favicon.png, tsconfig.json 존재 확인 됨.")
+
+#     except FileNotFoundError:
+#         print(f"\n❌ 오류: 소스 디렉토리 ({SOURCE_DIR})를 찾을 수 없습니다. 경로를 확인해주세요.")
+#     except Exception as e:
+#         print(f"\n❌ 오류가 발생했습니다: {e}")
+
+
+
+
+
 def create_project_structure(target_path: str):
     """
     주어진 경로에 기본 파일들을 복사하고 'assets' 폴더를 생성합니다.
+    'favicon.png'와 'thumbnail.png'는 'assets' 폴더 안에 복사됩니다.
 
     Args:
         target_path (str): 파일을 복사하고 구조를 만들 대상 경로입니다.
     """
     
     # 1. 소스 파일 및 폴더의 기준 경로 설정
-    # 이 스크립트가 실행되는 디렉토리 기준으로 'dummy_data/default_files' 경로를 설정합니다.
-    # sys.argv[0]를 사용하여 스크립트의 경로를 기준으로 설정하는 것이 안전하지만, 
-    # 간단하게 현재 작업 디렉토리를 기준으로 설정하겠습니다.
-    
-    # 주의: 실제 환경에서는 BASE_DIR을 프로젝트 루트로 정확히 지정해야 합니다.
-    #BASE_DIR = Path(__file__).resolve().parent if '__file__' in locals() else Path(os.getcwd())
-    
-    # 소스 디렉토리 경로
     SOURCE_DIR = PROJECT_ROOT / "dummy_data" / "default_files" 
     
     # 대상 디렉토리 경로 (사용자 입력)
     DEST_DIR = Path(target_path)
     
-    # 복사할 파일 목록
-    FILES_TO_COPY = ["index.html", "style.css", "favicon.png", "tsconfig.json"]
+    # 'assets' 폴더 경로
+    ASSETS_DIR = DEST_DIR / "assets"
+    
+    # 대상 경로 루트에 직접 복사할 파일 목록
+    ROOT_FILES_TO_COPY = ["index.html", "style.css", "tsconfig.json", "game_metadata.json"]
+    
+    # 'assets' 폴더 안에 복사할 파일 목록
+    ASSETS_FILES_TO_COPY = ["favicon.png", "thumbnail.png"]
     
     try:
-        # 2. 대상 경로가 존재하는지 확인하고 없으면 생성
-        # exist_ok=True: 이미 경로가 존재해도 오류가 발생하지 않음
-        
-        if not os.path.exists(DEST_DIR):
-            DEST_DIR.mkdir(parents=True, exist_ok=True)
-            print(f"✅ 대상 디렉토리 준비 완료: {DEST_DIR}")
+        # 2. 대상 경로 및 assets 경로가 존재하는지 확인하고 없으면 생성
+        DEST_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"✅ 대상 디렉토리 준비 완료: {DEST_DIR}")
 
-        # 3. 기본 파일 복사
-        for filename in FILES_TO_COPY:
+        # 'assets' 폴더 생성
+        ASSETS_DIR.mkdir(exist_ok=True)
+        print(f"   -> 'assets' 폴더 준비 완료: {ASSETS_DIR.name}/")
+        
+        # 3. 루트에 복사할 기본 파일 복사
+        for filename in ROOT_FILES_TO_COPY:
             source_file = SOURCE_DIR / filename
             dest_file = DEST_DIR / filename
             
             if not dest_file.exists():
                 if source_file.exists():
-                    # shutil.copy2는 파일 데이터와 메타데이터(수정 시간 등)를 모두 복사합니다.
                     shutil.copy2(source_file, dest_file)
-                    print(f"   -> 파일 복사 완료: {filename}")
+                    print(f"   -> 파일 복사 완료 (루트): {filename}")
                 else:
                     print(f"⚠️ 경고: 소스 파일이 존재하지 않습니다: {source_file}")
-            # else:
-            #     print(f"대상 파일이 이미 존재합니다.: {dest_file}")
 
-        # 4. 'assets' 폴더 생성
-        assets_dir = DEST_DIR / "assets"
-
-        if not os.path.exists(assets_dir):
-            assets_dir.mkdir(exist_ok=True)
-            print(f"   -> 폴더 생성 완료: {assets_dir.name}/")
-
-        #print("\n✨ index.html, style.css, favicon.png, tsconfig.json 존재 확인 됨.")
+        # 4. 'assets' 폴더 안에 파일 복사
+        for filename in ASSETS_FILES_TO_COPY:
+            source_file = SOURCE_DIR / filename
+            dest_file = ASSETS_DIR / filename # <- ASSETS_DIR로 대상 경로 변경
+            
+            if not dest_file.exists():
+                if source_file.exists():
+                    shutil.copy2(source_file, dest_file)
+                    print(f"   -> 파일 복사 완료 (assets): {ASSETS_DIR.name}/{filename}")
+                else:
+                    print(f"⚠️ 경고: 소스 파일이 존재하지 않습니다: {source_file}")
 
     except FileNotFoundError:
         print(f"\n❌ 오류: 소스 디렉토리 ({SOURCE_DIR})를 찾을 수 없습니다. 경로를 확인해주세요.")
     except Exception as e:
         print(f"\n❌ 오류가 발생했습니다: {e}")
+
+
+
 
 # # --- 실행 부분 ---
 # if __name__ == "__main__":

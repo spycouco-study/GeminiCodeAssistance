@@ -14,8 +14,12 @@ def BASE_PUBLIC_DIR():
         #return Path("../VerySimpleTypeScriptProject_AtoZ_Game/public")
         return PROJECT_ROOT.parent / "VerySimpleTypeScriptProject_AtoZ_Game" / "public"
     
+    
 
     
+def ALL_GAMES_METADATA():
+    return BASE_PUBLIC_DIR() / "all_games_metadata.json"
+
 def GAME_DIR(game_name:str):
     return BASE_PUBLIC_DIR() / game_name
 
@@ -30,6 +34,9 @@ def SPEC_PATH(game_name:str):
 
 def CHAT_PATH(game_name:str):
     return BASE_PUBLIC_DIR() / game_name / "chat.json"
+
+def GAME_METADATA_PATH(game_name:str):
+    return BASE_PUBLIC_DIR() / game_name / "game_metadata.json"
 
 def ASSETS_PATH(game_name:str):
     return BASE_PUBLIC_DIR() / game_name / "assets"

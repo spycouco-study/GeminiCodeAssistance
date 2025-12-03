@@ -42,7 +42,7 @@ data.json에 저장될 JSON 데이터 전체를 이곳에 넣으세요.
 ###DATA_END###
 
 ###NEW_ASSET_START###
-새로운 Asset이 추가된 경우, 각 Asset을 생성하기 위해 AI에게 전달해야하는 description을 아래 예시와 같은 JSON 형식으로 작성해 주세요. 새로운 Asset이 추가되지 않았다면 비워두세요. 이미지는 file_name, isBackgroundImage, width, height를 반드시 포함해 주세요. BackgroundImage가 아닌 경우 배경제거 후처리 작업이 원활하도록 object와 대비되는 plain color로 여백을 채우도록 하는 지시문을 description에 추가해 주세요. 사운드는 file_name, isBackgroundMusic, duration_seconds 반드시 포함시켜 주세요. 각 에셋은 게임의 구도, 분위기, 톤의 일관성을 유지하도록 해주세요.
+새로운 Asset이 추가된 경우, 각 Asset을 생성하기 위해 AI에게 전달해야하는 description을 아래 예시와 같은 JSON 형식으로 작성해 주세요. 새로운 Asset이 추가되지 않았다면 비워두세요. 이미지는 file_name, isBackgroundImage, width, height를 반드시 포함해 주세요. BackgroundImage가 아닌 경우 배경제거 후처리 작업이 원활하도록 object와 대비되는 plain color로 여백을 채우도록 하는 지시문을 description에 추가해 주세요. 이미지는 기본적으로 2D pixel art 톤으로 만들어주세요. 사운드는 file_name, isBackgroundMusic, duration_seconds 반드시 포함시켜 주세요. 각 에셋은 게임의 구도, 분위기, 톤의 일관성을 유지하도록 해주세요.
 {{
     "images": [
         {{ "file_name": str, "description": str, "isBackgroundImage": boolean, "width": int, "height": int }}
@@ -53,7 +53,13 @@ data.json에 저장될 JSON 데이터 전체를 이곳에 넣으세요.
 }}
 ###NEW_ASSET_END###
 
+###CATEGORY_START###
+아래의 9가지 카테고리중 이 게임이 어디에 속하는지 하나를 골라 반환해 주세요.
+action, click, shooting, quiz, tycoon, defense, music, puzzle, etc
+###CATEGORY_END###
+
 ###DESCRIPTION_START###
 작업한 내용에 대한 간단한 설명을 이곳에 넣으세요.
-'사용자 질문'이 있는 경우에만 그에 대한 답변도 이곳에 넣어 주세요.
+비개발자도 이해할 수 있도록 아주 간략하고 쉽게 설명해주세요.
+'사용자 질문'이 있는 경우에만 그에 대한 답변도 이곳에 넣으세요.
 ###DESCRIPTION_END###

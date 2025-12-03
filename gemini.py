@@ -1,5 +1,7 @@
+import datetime
 import json
 from pathlib import Path
+import random
 import re
 import shutil
 import subprocess
@@ -7,6 +9,8 @@ import tempfile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from all_games_metadata import search_metadata_by_author, search_metadata_by_category, upsert_metadata
+from tools.uuid import generate_uuid4
 from model_info_gemini import gemini_client, model_name
 
 import os
@@ -18,7 +22,7 @@ from realtime import List
 
 from generate_image import generate_image, run_image_generation_with_delay
 from generate_sound import generate_sounds
-from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
+from base_dir import BASE_PUBLIC_DIR, GAME_DIR, CODE_PATH, DATA_PATH, GAME_METADATA_PATH, SPEC_PATH, CHAT_PATH, ASSETS_PATH, ARCHIVE_LOG_PATH
 from classes import PromptDeviderProcessor, AnswerTemplateProcessor, ClientError, MakePromptTemplateProcessor, ModifyPromptTemplateProcessor, QuestionTemplateProcessor, SpecQuestionTemplateProcessor
 from make_default_game_folder import create_project_structure
 from make_dummy_image_asset import check_and_create_images_with_text
@@ -209,6 +213,120 @@ CODE_PATH_NOCOMMENT = ""#ePath(r"C:\Users\UserK\Desktop\final project\ts_game\Ga
 
 
 
+
+
+
+
+
+# 요청 바디 모델 정의
+class ChangeGameTitleRequest(BaseModel):
+    game_name: str  # 게임 고유 ID
+    new_title: str  # 새로운 게임 타이틀
+
+
+def update_game_metadata(game_name: str, new_title: str):
+    metadata_file = GAME_METADATA_PATH(game_name)
+    
+    # 기존 메타데이터 로드 (있으면)
+    if metadata_file.exists():
+        with open(metadata_file, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+    else:
+        metadata = {}
+    
+    # 타이틀 업데이트
+    metadata["game_title"] = new_title
+    
+    # 저장
+    with open(metadata_file, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+        
+    upsert_metadata(metadata)
+    
+    return metadata
+
+
+# 더 완전한 버전 (메타데이터 파일 사용)
+@app.post("/change-game-title")
+async def change_game_title(request: ChangeGameTitleRequest):
+    try:
+        # 메타데이터 업데이트
+        metadata = update_game_metadata(request.game_name, request.new_title)
+        
+        return {
+            "status": "success",
+            "message": "게임 타이틀이 성공적으로 변경되었습니다.",
+            "data": metadata
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.get("/get-game-title")
+async def get_game_title(game_name: str):
+    try:
+        metadata_file = GAME_METADATA_PATH(game_name)
+        
+        if metadata_file.exists():
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+                title = metadata.get("game_title", game_name)  # 기본값으로 game_name 사용
+        else:
+            # 메타데이터 파일이 없으면 game_name을 기본 타이틀로 사용
+            title = game_name
+        
+        return {
+            "title": title,
+            "game_name": game_name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # 에러 발생 시 기본값으로 game_name 반환
+        return {
+            "title": game_name,
+            "game_name": game_name
+        }
+
+
+@app.get("/get-unique-id")
+async def get_unique_id():
+    """
+    고유한 게임 ID를 생성하여 반환합니다.
+    
+    Returns:
+        dict: 게임 ID를 포함한 응답
+            - id: 생성된 고유 ID (UUID 기반)
+            - created_at: 생성 시간
+    """
+    try:
+        unique_id = generate_uuid4()
+        
+        return {
+            "id": unique_id,
+            "created_at": datetime.datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ID 생성 실패: {str(e)}")
+
+
+
+@app.get("/games/{game_id}/metadata")
+async def get_game_metadata(game_id: str):
+    metadata_file = GAME_METADATA_PATH(game_id)
+
+    if metadata_file.exists():
+        with open(metadata_file, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+            return metadata
+    else:
+       return {}
+
 @app.post("/category")
 async def category(request: CodeRequest):
     prompt = f"[사용자쿼리: {request.message}]\n" + """
@@ -313,8 +431,14 @@ def parse_ai_code_response(response_text):
     asset_end = response_text.find("###NEW_ASSET_END###")
     json_asset_string = response_text[asset_start:asset_end].strip()
     result['new_asset_list'] = json_asset_string
+    
+    # 4. 카테고리 (문자열)
+    category_start = response_text.find("###CATEGORY_START###") + len("###CATEGORY_START###")
+    category_end = response_text.find("###CATEGORY_END###")
+    category_string = response_text[category_start:category_end].strip()
+    result['category'] = category_string
 
-    # 4. 설명 블록 추출
+    # 5. 설명 블록 추출
     desc_start = response_text.find("###DESCRIPTION_START###") + len("###DESCRIPTION_START###")
     desc_end = response_text.find("###DESCRIPTION_END###")
     result['description'] = response_text[desc_start:desc_end].strip()
@@ -396,12 +520,36 @@ def modify_code(request, question, game_name):
     else:
         original_data = ""
     
-
+    
+    isFirstCreated = False
 
     if original_code == "":
+        isFirstCreated = True
         prompt = makePTP.get_final_prompt(request, question)
     else:
+        isFirstCreated = False
         prompt = modifyPTP.get_final_prompt(request, question, original_code, original_data)
+
+
+
+    if isFirstCreated:
+        metadata_file = GAME_METADATA_PATH(game_name)
+    
+        if metadata_file.exists():
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+        else:
+            metadata = {}
+        
+        metadata["id"] = game_name  # 게임 고유 ID 설정
+        metadata["thumbnail"] = f"/static/{game_name}/assets/thumbnail.png"
+        
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        
+        upsert_metadata(metadata)
+
+
 
     # 💡 config 객체를 생성하여 응답 형식을 JSON으로 지정합니다.
     # config = types.GenerateContentConfig(
@@ -423,6 +571,7 @@ def modify_code(request, question, game_name):
     game_data = remove_code_fences_safe(responseData['game_data'])
     description = remove_code_fences_safe(responseData['description'])
     new_asset_list = remove_code_fences_safe(responseData['new_asset_list'])
+    category = remove_code_fences_safe(responseData['category'])
     
     # asset_list = json.loads(asset_list)
     # print(asset_list)
@@ -447,6 +596,26 @@ def modify_code(request, question, game_name):
 
     #         with open(OLD_DATA(game_name), 'w', encoding='utf-8') as f:
     #             f.write(original_data)
+
+        
+    if isFirstCreated:
+        if category is not None and category != '':
+            metadata_file = GAME_METADATA_PATH(game_name)
+        
+            if metadata_file.exists():
+                with open(metadata_file, "r", encoding="utf-8") as f:
+                    metadata = json.load(f)
+            else:
+                metadata = {}
+            
+            metadata["category"] = category
+            
+            with open(metadata_file, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
+            
+            upsert_metadata(metadata)
+    
+
 
     modify_check = ""
 
@@ -488,7 +657,7 @@ def modify_code(request, question, game_name):
 
 
     
-    if new_asset_list:        
+    if new_asset_list is not None and new_asset_list != '':        
         error = error + validate_json(new_asset_list)
         json_new_asset_list = json.loads(new_asset_list)
         print(json_new_asset_list)
@@ -749,6 +918,12 @@ async def process_code(request: CodeRequest):
                         current_ver = version_info.get("version")
                         create_version(GAME_DIR(game_name), parent_name=current_ver, summary=user_requests)
                         
+                metadata_file = GAME_METADATA_PATH(game_name)
+                if metadata_file.exists():
+                    with open(metadata_file, "r", encoding="utf-8") as f:
+                        metadata = json.load(f)
+                        upsert_metadata(metadata)
+
                 description_total = devide_result + description_total + "\n\n" + Inappropriate_answer
                 save_chat(CHAT_PATH(game_name), "bot", description_total)
                 return {
@@ -1050,7 +1225,7 @@ atp = AnswerTemplateProcessor()
     
 
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 
@@ -1461,9 +1636,98 @@ async def replace_asset(
 
 
 
+@app.get("/arcade/games")
+def get_arcade_games_endpoint(
+    category: Optional[str] = Query("all", description="Category filter ('all', 'action', 'puzzle', etc.)")
+):
+    """
+    모든 아케이드 게임 목록을 반환합니다. 선택적으로 카테고리 필터링을 지원합니다.
+    """
+    games = search_metadata_by_category(category)
+    
+    if not games:
+        # 카테고리에 해당하는 게임이 없는 경우
+        return []
+    
+    return {"games": games}
+
+
+@app.get("/arcade/trending")
+def get_trending_game_endpoint():
+    """
+    트렌딩/주요 아케이드 게임 하나를 배너용으로 반환합니다.
+    """
+    all_games = search_metadata_by_category('all')
+    
+    if not all_games:
+        # 게임이 없는 경우 404를 반환하거나 빈 객체를 반환할 수 있지만, 여기서는 404를 사용
+        raise HTTPException(status_code=404, detail="No games available for trending banner.")
+    
+    # plays가 가장 높은 게임을 선택하거나, 임의의 게임을 반환 (여기서는 간단히 임의 선택)
+    trending_game = random.choice(all_games)
+    
+    return {"game": trending_game}
+
+
+@app.get("/user/created")
+def get_user_created_games_endpoint(
+    user_id: Optional[str] = Query(None, description="User ID to filter games by author.")
+):
+    """
+    특정 사용자가 만든 게임 목록을 반환합니다. (author 필드 사용)
+    """
+    if not user_id:
+        # user_id가 없으면 빈 리스트 반환 (세션 인증이 없다는 가정 하에)
+        return []
+        
+    # user_id를 author로 간주하고 검색
+    games = search_metadata_by_author(user_id)
+    
+    return {"games": games}
 
 
 
+@app.get("/user/liked")
+def get_user_liked_games_endpoint(
+    user_id: Optional[str] = Query(None, description="User ID for liked games list.")
+):
+    """
+    특정 사용자가 '좋아요' 표시한 게임 목록을 반환합니다. (더미 데이터 또는 실제 DB 로직 필요)
+    """
+    if not user_id:
+        return []
+
+    # --- 실제 환경에서는 DB에서 해당 user_id의 좋아요 목록을 조회해야 합니다. ---
+    # 임시: 모든 게임을 불러와서 무작위로 2개를 '좋아요' 데이터로 반환합니다.
+    all_games = search_metadata_by_category('all')
+    
+    if not all_games:
+        return []
+
+    # 최대 2개만 선택
+    liked_games = random.sample(all_games, k=min(2, len(all_games)))
+    
+    return {"games": liked_games}
+
+
+
+@app.get("/showcase/games")
+def get_showcase_games_endpoint(
+    limit: int = Query(4, ge=1, description="Maximum number of games to return.")
+):
+    """
+    홈페이지 쇼케이스에 표시할 게임 목록을 반환합니다.
+    """
+    all_games = search_metadata_by_category('all')
+    
+    if not all_games:
+        return []
+
+    # plays 점수가 높은 순으로 정렬하거나 (실제 로직), 무작위로 선택 (임시 로직)
+    # 임시 로직: 무작위 선택 후 limit 수만큼 반환
+    showcase_games = random.sample(all_games, k=min(limit, len(all_games)))
+    
+    return {"games": showcase_games}
 
 
 

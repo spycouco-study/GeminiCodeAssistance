@@ -21,7 +21,8 @@ DEFAULT_IGNORE = [
     "index.html",
     "style.css",
     "tsconfig.json",
-    "*.bak"
+    "*.bak",
+    "game_metadata.json"
 ]
 
 ARCHIVE_DIRNAME = "archive"
